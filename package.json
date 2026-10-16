@@ -1,0 +1,21 @@
+{
+  "name": "jobbench",
+  "version": "1.0.0",
+  "description": "Job Search Workbench（求职助手）—— 本地运行的 BOSS直聘 岗位筛选工作台：爬岗位 + 按你的知识库写定制招呼语 + 只填不发 / 人工确认发送",
+  "license": "MIT",
+  "author": "LSX",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js --open",
+    "collect": "node greet.js --mode=collect",
+    "fill": "node greet.js --mode=send --fill-only",
+    "test": "node --test tests/unit/*.test.js"
+  },
+  "dependencies": {
+    "patchright": "^1.63.0",
+    "playwright-core": "^1.49.0"
+  }
+}
