@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Search Workbench · 求职助手</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>求职助手</h1>
+    <!-- 启动异常红字提示（2026-10-13 已定）：初始化出错只在标题后红字说明，
+         不把整页替换成错误卡片 —— 页面主体还能正常用 -->
+    <span class="hdr-err" id="hdrError" style="display:none"></span>
+    <span class="badge" id="statusBadge">读取中</span>
+    <span class="badge" id="browserBadge" style="display:none">浏览器开着</span>
+    <button class="sm" id="btnCloseBrowser" style="display:none" onclick="closeBrowser()">关闭浏览器</button>
+    <span class="spacer"></span>
+  </div>
+</header>
+
+<div class="wrap" id="mainWrap">
+
+  <!-- 等你登录（全局提示） -->
+  <div class="await" id="loginBox" style="border-color: var(--warn); background: var(--warn-wash); display:none">
+    <p class="h" style="color:var(--warn)">检测到未登录，请在弹出的浏览器窗口里扫码登录</p>
+    <p style="font-size:12.5px; color:var(--ink-2); margin:0 0 8px">登录成功后会自动继续，最多等 10 分钟。这个窗口不用关。</p>
+  </div>
+
+  <!-- BOSS 安全验证（全局提示） -->
+  <div class="await" id="safeBox" style="border-color: var(--warn); background: var(--warn-wash); display:none">
+    <p class="h" style="color:var(--warn)">BOSS 弹了安全验证，请在浏览器窗口里手动完成</p>
+    <p style="font-size:12.5px; color:var(--ink-2); margin:0 0 8px">滑块拖到最右，或按提示点选图形。完成后这里会自动消失，任务自动继续（最多等 5 分钟）。</p>
+  </div>
+
+  <!-- 等你确认（全局提示） -->
+  <div class="await" id="awaitBox">
+    <p class="h" id="awaitHead">招呼语已填好，等你确认</p>
+    <p class="g" id="awaitText"></p>
+    <div class="row">
+      <span class="hint" id="awaitHint">在浏览器里点发送后，这里会自动检测到并进入下一个岗位</span>
+    </div>
+  </div>
+
+  <!-- 页签（介绍 + 知识库 + 工作台五步，按使用顺序排列） -->
+  <nav class="tabs">
+    <button class="tab" data-tab="about" onclick="switchTab('about')">项目介绍</button>
+    <button class="tab" data-tab="how" onclick="switchTab('how')">如何使用</button>
+    <button class="tab" data-tab="kb" onclick="switchTab('kb')">个人经历知识库</button>
+    <button class="tab on" data-tab="dir" onclick="switchTab('dir')">岗位初筛</button>
+    <button class="tab" data-tab="fetch" onclick="switchTab('fetch')">获取岗位</button>
+    <button class="tab" data-tab="filter" onclick="switchTab('filter')">二次筛选</button>
+    <button class="tab" data-tab="edit" onclick="switchTab('edit')">编辑招呼语</button>
+    <button class="tab" data-tab="send" onclick="switchTab('send')">发送</button>
+    <button class="tab" data-tab="records" onclick="switchTab('records')">记录</button>
+    <button class="tab" data-tab="settings" onclick="switchTab('settings')">设置</button>
+  </nav>
+
+  <!-- ========== 页 0：项目介绍（自适应高度：内容长，页面整体滚动） ========== -->
+  <div class="page" id="pageAbout">
+    <div class="card">
+      <div class="abwrap">
+        <p class="absec">免责声明</p>
+        <div class="abwarn">
+          <p class="abp" style="margin-bottom:6px">本项目做了一些爬取安全措施（拟人操作、随机节奏、限额与只填不发），但用自动化工具操作账号<b>仍然有被封号的风险</b>。<b>如果介意，请不要使用。</b></p>
+          <p class="abp" style="margin-bottom:6px">本项目是<b>纯本地项目</b>：数据全部放在你电脑上的项目目录里，不连远端服务器、不把你的数据上传到任何地方；但运行时<b>需要联网环境</b>（因为它要打开并操作 BOSS 网页）。</p>
+          <p class="abp" style="margin-bottom:6px">你的信息<b>唯一的对外出口</b>只有两处：<b>发给 HR 的招呼语</b>，以及<b>你和 AI 助手之间的对话</b>。除此之外，本项目<b>不会泄露你的任何信息</b>。</p>
+          <p class="abp" style="margin-bottom:0">本项目仅供学习与技术研究，请自行遵守 BOSS直聘用户协议与所在地法律法规，不要用于大规模商业获客或骚扰；招呼语会发给真实 HR，请确保内容真实，面试会被追问。</p>
+        </div>
+
+        <p class="absec">这个项目是什么</p>
+        <p class="abp">Job Search Workbench（求职助手）是一个 <b>本地运行</b> 的 BOSS直聘 自动化工作台：它在你这台电脑上跑，只监听本机（127.0.0.1），配置与知识库都留在本地、不上传到任何地方。它帮你批量爬取岗位、读取 JD 与招聘者活跃度、按你的知识库生成逐条定制的招呼语，最后由 <b>你亲自确认发送</b>。</p>
+        <p class="abli">它<b>不是</b>无人值守的群发器：默认「只填不发」，所有发出去的消息都经过你的把关</p>
+        <p class="abli">配置、知识库、候选池、打招呼记录全部是项目目录里的明文文件，随时可查、可改、可删</p>
+
+        <p class="absec">它能做什么（六步链路）</p>
+        <p class="abli"><b>1 备好知识库</b>：填「我是谁 / 我的经历 / 我的技能」，也可让 agent 访谈式帮你补全；它是招呼语取材的唯一来源</p>
+        <p class="abli"><b>2 岗位初筛</b>：来源（搜索 / 推荐 / 意向方向）、城市、单次数量；搜索模式下填投递关键词</p>
+        <p class="abli"><b>3 爬岗位</b>：自动逐个打开岗位页，读出 JD、薪资、招聘者活跃度、公司规模与行业，进候选池</p>
+        <p class="abli"><b>4 二次筛选</b>：按类型 / 活跃度 / 薪资 / 规模 / 行业 / 双休过滤排序，勾选要投的；也可让 agent 智能评分勾选</p>
+        <p class="abli"><b>5 写招呼语</b>：勾选岗位逐条生成定制版（对准这条 JD，不是群发模板），可手改，自动保存</p>
+        <p class="abli"><b>6 发送</b>：默认「放到输入框」填好就停，你在浏览器里过目后自己点发送；全过程留痕到「记录」</p>
+
+        <p class="absec">哪里需要 agent，agent 能做什么</p>
+        <p class="abp">机械活工具自己干，判断活交给 agent；两者分工明确，你随时能接管。</p>
+        <p class="abli"><b>工具自己干</b>（机械部分）：浏览器操控、爬取解析、招呼语填入、记录留痕、安全护栏</p>
+        <p class="abli"><b>agent 来干</b>（智能部分）：评判岗位与你简历的匹配度并自动勾选、按 JD 逐条写定制招呼语、通过访谈帮你补全知识库、按你的情况调爬取数量与节奏</p>
+        <p class="abli">agent 通过本地 HTTP 接口操作本工具，每一步都在面板上实时可见；操作手册见项目根目录 <b>AGENTS.md</b>，把它交给你的 AI 助手即可</p>
+        <p class="abli">agent 无权替你自动发送：接口层面只允许「只填不发」或「逐条等你确认」；全自动发送必须你本人在面板上亲自批准</p>
+
+        <p class="absec">账号安全性防护</p>
+        <p class="abli"><b>来源层</b>：面板与接口只受理来自本机的请求（Host / Origin 白名单，只认 127.0.0.1 / localhost）。恶意网页打不开你的接口，伪装域名（DNS 重绑定）也读不到你的知识库、清不掉你的候选池；命令行与 agent 正常调用不受影响</p>
+        <p class="abli"><b>驱动层</b>：用 Patchright（Playwright 的反检测分支），不产生 CDP 自动化痕迹；跑的是你自己的 Chrome 配置目录，指纹与登录态都是真实的</p>
+        <p class="abli"><b>行为层</b>：点击带鼠标轨迹与随机落点（含真实按压时长）、滚动有速度包络与微动、招呼语分块粘贴模拟人工输入、看岗位有停顿（默认停留 1~2 秒、滚轮滑动 300~700 像素）、岗位间隔随机：爬取默认 4~7 秒（约 25% 概率进入 7~11 秒的「偶尔慢一点」）、发送默认 4~6 秒（约 25% 概率进入 6~12 秒）</p>
+        <p class="abli"><b>预热</b>：每次任务开头先随机打开一个常见网站（百度 / 必应 / 网易 里随机选一个）停留一两秒，再进 BOSS。既让首页渲染完整（不预热容易只加载出一两张卡片），也避免「直奔目标站」这种脚本特征</p>
+        <p class="abli"><b>限额层</b>：每日发送上限（默认 60）、每日爬取上限（默认 80）、单次爬取上限（少量多次，服务端硬顶 30）；发送时按当日剩余额度自动截断</p>
+        <p class="abli"><b>流程层</b>：默认「只填不发」；「直接发送」必须你本人在面板上亲自确认；遇到安全验证会停下等你人工完成；反复失败的岗位进黑名单不再触碰</p>
+
+        <p class="absec">数据放在哪（都在本地）</p>
+        <p class="abli"><b>config.json</b>：爬取 / 发送 / 节奏等设置，以及城市</p>
+        <p class="abli"><b>knowledge.json</b>：你的知识库（我是谁 / 我的经历 / 我的技能）</p>
+        <p class="abli"><b>prompts/greeting.md</b>：招呼语提示词（设置页可改，可一键恢复默认）</p>
+        <p class="abli"><b>logs/last-collect.json</b>：候选池（跨批次累积、按岗位去重）</p>
+        <p class="abli"><b>logs/</b>：运行日志（run-*.log）、记录统计（stats.json）、已打招呼明细（已打招呼记录.txt）、黑名单（黑名单.txt）、勾选副本（checked.json）</p>
+        <p class="abli">界面记忆：筛选条件、勾选、来源 / 发送方式 / 意向方向、当前页签都存在浏览器本地，刷新或重启工具后自动回到上次的样子</p>
+
+        <p class="absec">使用建议</p>
+        <p class="abli"><b>少量多次</b>：一天多爬几轮、每轮 10 个，比一口气爬 50 个安全得多</p>
+        <p class="abli"><b>宁缺毋滥</b>：先用「放到输入框」人工把关，流程跑顺了再逐步提高自动化比例</p>
+        <p class="abli"><b>先跑顺再放开</b>：爬取数量与节奏都能在「设置」页调，但建议从默认值起，跑顺几轮、没触发风控再逐步加大</p>
+        <p class="abli"><b>正常时段</b>：白天使用；深夜的批量操作在风控眼里最可疑</p>
+        <p class="abli"><b>见好就收</b>：触发安全验证就停下休息，硬跑只会更糟</p>
+        <p class="abli"><b>内容要真</b>：招呼语会发给真人 HR，知识库只写真实做过的事</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 页 0.5：如何使用 ========== -->
+  <div class="page" id="pageHow">
+    <div class="card">
+      <div class="abwrap">
+        <p class="absec">第一次用</p>
+        <p class="abp">双击 <b>启动.bat</b>，浏览器自动打开面板 http://127.0.0.1:7788；在弹出的浏览器里扫码登录 BOSS，<b>一次即可</b>，之后长期复用（独立配置目录，不影响你日常用的 Chrome）。没有其他安装步骤。</p>
+        <p class="abli">面板打不开 = 服务没跑起来，重新双击 启动.bat 即可，不用重装</p>
+
+        <p class="absec">① 个人经历知识库</p>
+        <p class="abli">三个字段：<b>我是谁</b>（身份 / 学校专业 / 可实习时间 / 到岗情况 / 意向城市，写全，如「计算机相关专业应届生，可实习 6 个月、每周 5 天，能尽快到岗，意向北京」）、<b>我的经历</b>（可写多条，每条写具体：做了什么 / 怎么做 / 什么结果，带数字更好）、<b>我的技能</b>（顿号或逗号分隔，只写真实会的，写全）</p>
+        <p class="abli">它是招呼语质量的根基：<b>细节越多越好，这三个字段没有字数上限</b>，几千字甚至上万字 AI 都读得下；写得越具体，AI 越能挑出「和这条 JD 对得上的点」</p>
+        <p class="abli">可以自己填，也可以让 agent 通过访谈帮你补全；<b>边写边存</b>：改动 0.9 秒后自动写入，离开页面或关闭工具也会立即落盘，不用点保存</p>
+        <p class="abli">只填真实做过的事：招呼语会被 HR 逐字看到，面试可能被追问</p>
+
+        <p class="absec">② 岗位初筛</p>
+        <p class="abli"><b>来源三选一</b>：搜索（按你填的关键词搜）、推荐（BOSS 给你推的）、意向方向（你在 BOSS 上勾选的求职方向，点「刷新方向」可重新同步）</p>
+        <p class="abli"><b>城市</b>：省份 → 城市两级，全国 373 城；选定立即保存，搜索与推荐都严格按这个城市定位</p>
+        <p class="abli">注意例外：<b>「意向方向」来源跟的是你 BOSS 简历里的期望城市</b>，不受面板城市影响；页签后缀（如「(北京)」）才是实际城市，不对就去 BOSS 改简历期望城市</p>
+        <p class="abli"><b>岗位数量</b>：单次爬多少个，默认 10（少量多次）</p>
+        <p class="abli"><b>投递方向</b>：搜索模式下填关键词；<b>一次只爬一个方向</b>（避免跑偏），再加一个会替换掉上一个</p>
+
+        <p class="absec">③ 获取岗位</p>
+        <p class="abli">点「搜索岗位 / 爬推荐岗位 / 爬意向岗位」启动浏览器自动化，逐个打开岗位详情页，自动读出 <b>JD 正文、薪资、招聘者活跃度、公司规模、行业</b></p>
+        <p class="abli">爬完进<b>候选池</b>：跨批次累积、按岗位去重（重复的不占名额，自动补足目标数量）；你改过的招呼语和勾选绝不会被重爬覆盖</p>
+        <p class="abli"><b>候选池里是「爬取那一刻」的快照</b>：BOSS 上这些岗位会实时变动（招满、下架、改要求），本工作台看不到后续变化；建议爬到的岗位<b>尽早发送</b>，别囤太久</p>
+        <p class="abli">任务运行时顶栏显示「运行中」，可随时点「停止」（直接终止，没爬完的就不再爬）</p>
+        <p class="abli">「删除选中」删除前会自动备份到 <b>logs/last-collect.json.bak</b>；就算 agent 在命令行偷偷爬，面板也能检测到并自动并入候选池</p>
+
+        <p class="absec">④ 二次筛选</p>
+        <p class="abli"><b>筛选器</b>：类型（实习 / 全职自动判定）、活跃度（刚刚 / 今日 / 3日内 / 本周）、双休（有 = 每周 ≤5 天，无 = 每周 ≥6 天）、日薪下限（月薪自动折算日薪）、公司规模（BOSS 原生档位精确匹配）、行业关键词</p>
+        <p class="abli"><b>排序</b>：默认 / 活跃度优先 / 薪资优先；<b>已发送的岗位自动隐藏</b>，不再出现在候选里</p>
+        <p class="abli"><b>勾选</b>：单个点勾 / 按筛选结果全选 / 清空勾选；勾选会被记住，刷新不丢</p>
+        <p class="abli"><b>让 agent 智能二筛</b>：它搜公司背景、按你知识库评岗位匹配度，自动勾上匹配度高的（面板实时可见，不满意直接改成你要的）</p>
+        <p class="abli">筛选条件本身也会被记住，下次打开还是这套</p>
+
+        <p class="absec">⑤ 编辑招呼语</p>
+        <p class="abli">勾选的岗位逐条成行：岗位 / 公司 / JD（可折叠展开）/ 招呼语</p>
+        <p class="abli"><b>招呼语怎么来，两条路</b>：① 在「二次筛选」勾好岗位后，直接让你的 agent <b>批量生成</b>，它按「知识库 + 每条 JD」逐条写好；② 也可以自己在表格里<b>手动输入</b>，想写什么写什么</p>
+        <p class="abli">每条都对准各自的岗位：<b>两条调换着还能用就是不合格</b>；agent 写完后你照样能一条条改</p>
+        <p class="abli">改完自动保存：<b>0.9 秒</b>后写入，刷新或切换页面都不丢</p>
+        <p class="abli"><b>招呼语提示词</b>在「设置」页可调（语气、长度、该提什么、避什么）：点「修改招呼语提示词」在弹窗里编辑，保存立即生效，可一键恢复默认</p>
+
+        <p class="absec">⑥ 发送</p>
+        <p class="abli">指标卡实时刷新：已勾选 / 已填进输入框 / 已发出 / 跳过失败</p>
+        <p class="abli"><b>放到输入框（默认）</b>：逐个把招呼语填进 BOSS 输入框就停下，你在浏览器里过目、<b>亲自点发送</b>；发完自动进下一个</p>
+        <p class="abli"><b>注意：填进输入框后请尽快手动点发送</b>：这一步只是把文字放进输入框、还没发出去。若此时脚本再次运行、或 BOSS 页面被刷新，输入框里的招呼语就会消失，需要重新生成 / 重填</p>
+        <p class="abli"><b>直接发送</b>：填好即自动发送、连着跑，<b>必须你本人在面板上亲自确认</b>才会启动；agent 无权替你点</p>
+        <p class="abli">没有"全自动无人值守"选项：机器永远不能替你绕过确认，这是工具的核心设计原则</p>
+        <p class="abli">发送按当日剩余额度自动截断（每日上限默认 60）；遇到安全验证会停下等你人工完成，然后自动继续；「换职位沟通」之类的确认弹窗自动处理；全程随时可「停止」</p>
+
+        <p class="absec">⑦ 记录</p>
+        <p class="abli">四项统计各含<b>总量与今日</b>：<b>爬取 / 发送 / 放入输入框 / 下架</b>（下架 = 爬过的岗位已失效或被撤）</p>
+        <p class="abli">明细：时间 · 岗位 · 公司 · 状态（已填入到输入框 / 已发送 / 已下架），保留<b>最近 120 条</b>；往下滚时表头会吸顶跟着走</p>
+        <p class="abli">agent 也能读到这些数据（含勾选状态），你和它看到的是同一份事实</p>
+
+        <p class="absec">⑧ 设置</p>
+        <p class="abli"><b>限额</b>：一次最多爬 / 一天最多爬 / 一天最多发；出厂默认是 10 / 80 / 60，都能按你的情况调</p>
+        <p class="abli"><b>节奏</b>：发送与爬取的间隔（大多数时候几秒、偶尔慢一点的占比与时长）、沟通前在 JD 页面停留、爬取时停留与滚轮滑动</p>
+        <p class="abli">改动后点「保存设置」生效；没保存就切页会提示，选「不保存」则还原；本页刷新也不会丢未保存的改动；「撤销改动」「恢复默认设置」随时可用</p>
+
+        <p class="absec">顶栏状态</p>
+        <p class="abli"><b>空闲</b>：没任务，可以开始；<b>运行中</b>：正在爬取或发送；<b>已暂停 / 正在停止</b>：任务处理中；<b>出错了</b>：任务异常，去 logs/ 看最新日志</p>
+
+        <p class="absec">让 agent 帮你干</p>
+        <p class="abli">把项目根目录的 <b>AGENTS.md</b> 交给你的 AI 助手，它就能按手册通过本地接口操作整个工具</p>
+        <p class="abli">推荐交给它：<b>智能二筛</b>（搜公司背景 + 评匹配度 + 自动勾选）、<b>逐条写定制招呼语</b>、<b>补全知识库</b>、<b>按你的情况调爬取数量与节奏</b></p>
+        <p class="abli">它的每一步操作面板上实时可见，随时可以「停止」；勾选和招呼语不满意，直接自己改</p>
+
+        <p class="absec">节奏</p>
+        <p class="abp">一句话：<b>宁愿慢，不要快</b>。具体建议见「项目介绍」页的「使用建议」一节。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 页 1：岗位初筛（纯配置） ========== -->
+  <div class="page wp" id="pageDir">
+    <div class="card">
+      <h2><span class="step">1</span>岗位初筛</h2>
+      <div class="row" style="margin-bottom:10px">
+        <label class="fld">来源</label>
+        <select id="collectSource" onchange="onSourceChange()">
+          <option value="search">搜索（通过 BOSS 搜出来的岗位）</option>
+          <option value="recommend">推荐（BOSS 给你推荐的）</option>
+          <option value="expect">意向岗位（你在 BOSS 勾选的方向）</option>
+        </select>
+      </div>
+      <div class="row" id="cityRow" style="margin-bottom:10px">
+        <label class="fld">省份</label>
+        <select id="provSel" style="min-width:130px"></select>
+        <label class="fld" style="margin-left:14px">城市</label>
+        <select id="citySel" style="min-width:130px"></select>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <label class="fld">岗位数量</label>
+        <input type="number" id="maxJobs" min="1" max="10" value="10" style="width:110px" title="单次最多爬多少个岗位（少量多次：一天可以多爬几轮）" oninput="clampMaxJobs(this)">
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <label class="fld">经验要求</label>
+        <select id="experienceSel" onchange="saveExperience(this.value)" style="min-width:160px" title="BOSS 的经验档位筛选，留空 = 不限">
+          <option value="">不限（返回全部经验档）</option>
+          <option value="108">在校生 · 应届</option>
+          <option value="101">1年以下</option>
+          <option value="102">1-3年</option>
+          <option value="103">3-5年</option>
+          <option value="104">5-10年</option>
+          <option value="105">10年以上</option>
+        </select>
+      </div>
+      <div class="row" id="kwRow" style="margin-bottom:10px">
+        <label class="fld">投递方向</label>
+        <div class="chips" id="kwChips"></div>
+        <input type="text" id="kwNew" placeholder="加一个方向，如：测试开发实习" style="width:250px">
+        <button onclick="addKeyword()">添加</button>
+      </div>
+      <div class="row" id="expectRow" style="display:none">
+        <label class="fld">意向方向</label>
+        <div class="chips" id="expectChips"></div>
+        <a href="javascript:loadExpects(true)" title="忽略缓存，去 BOSS 重新读一次方向列表"
+           class="mini" style="text-decoration:underline; white-space:nowrap; align-self:center">刷新方向</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 页 2：获取岗位（爬取入口 + 全量岗位表） ========== -->
+  <div class="page wp" id="pageFetch">
+    <div class="card grow">
+      <h2><span class="step">2</span>获取岗位 <span class="hint" id="fetchInfo" style="flex:1; text-align:right"></span></h2>
+      <div class="row" style="margin-bottom:10px">
+        <button class="primary" id="btnCollect" onclick="collect()">搜索岗位</button>
+        <!-- 「停止」只在任务运行时出现（2026-10-13 已定稿：点了直接终止脚本，
+             不要暂停/继续这套） -->
+        <button id="btnStop" onclick="stop()" disabled style="display:none">停止</button>
+        <span class="hint" id="collectHint"></span>
+        <span class="spacer"></span>
+        <a id="goDel" href="javascript:deleteSelected()" class="mini"
+           style="display:none; text-decoration:underline; white-space:nowrap; align-self:center">删除选中</a>
+        <a id="goFilter" href="javascript:switchTab('filter')" class="mini"
+           style="display:none; text-decoration:underline; white-space:nowrap; align-self:center">去二次筛选 →</a>
+      </div>
+      <div class="table" id="fetchWrap" style="display:none">
+        <div class="thead" id="fetchHead"></div>
+        <div id="fetchRows"></div>
+      </div>
+      <div id="fetchEmpty" class="empty">还没有获取到岗位。点上面按钮开始，爬到的都会列在这里。</div>
+    </div>
+  </div>
+
+  <!-- ========== 页 3：二次筛选（挑岗位） ========== -->
+  <div class="page wp" id="pageFilter">
+    <div class="card grow">
+      <h2><span class="step">3</span>二次筛选
+        <span class="spacer" style="flex:1"></span>
+        <span class="hint" id="selInfo">已选 0 个</span>
+      </h2>
+
+      <div class="row" style="margin-bottom:8px">
+        <label class="fld">类型</label>
+        <select id="fType" onchange="renderRows()" style="min-width:96px">
+          <option value="">不限</option>
+          <option value="intern">仅实习/校招</option>
+          <option value="full">仅全职</option>
+        </select>
+        <label class="fld">活跃度</label>
+        <select id="fActive" onchange="renderRows()" style="min-width:140px">
+          <option value="">不限</option>
+          <option value="hot">仅 刚刚/今日活跃</option>
+          <option value="mid">放宽到 3日内/本周</option>
+        </select>
+        <label class="fld">双休</label>
+        <select id="fWeek" onchange="renderRows()" style="min-width:130px">
+          <option value="">不限</option>
+          <option value="yes">有双休</option>
+          <option value="no">无双休</option>
+        </select>
+        <label class="fld">日薪下限</label>
+        <input type="number" id="fSal" placeholder="如 150" style="width:92px" oninput="renderRows()"
+          title="按天折算比较，月薪会自动换算成日薪；工资没解析出来的岗位不受影响">
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <label class="fld">规模</label>
+        <select id="fSize" onchange="renderRows()" style="min-width:126px">
+          <option value="">不限</option>
+          <option value="0-20人">0-20人</option>
+          <option value="20-99人">20-99人</option>
+          <option value="100-499人">100-499人</option>
+          <option value="500-999人">500-999人</option>
+          <option value="1000-9999人">1000-9999人</option>
+          <option value="10000人以上">10000人以上</option>
+        </select>
+        <label class="fld">行业含</label>
+        <input type="text" id="fInd" placeholder="如：互联网" style="width:120px" oninput="renderRows()">
+        <label class="fld">排序</label>
+        <select id="fSort" onchange="renderRows()" style="min-width:100px">
+          <option value="">默认</option>
+          <option value="active">活跃度优先</option>
+          <option value="salary">薪资优先</option>
+        </select>
+        <button class="sm" onclick="quickPick()">按筛选结果全选</button>
+        <button class="sm" onclick="clearPick()">清空勾选</button>
+        <span class="hint" id="filterInfo"></span>
+      </div>
+
+      <div class="table" id="tableWrap" style="display:none">
+        <div class="thead" id="thead"></div>
+        <div id="rows"></div>
+      </div>
+      <div id="tableEmpty" class="empty">还没有候选岗位。去「获取岗位」页爬一批。</div>
+    </div>
+  </div>
+
+  <!-- ========== 页 4：编辑招呼语（勾选的岗位逐条改，不碰 BOSS 输入框） ========== -->
+  <div class="page wp" id="pageEdit">
+    <div class="card grow">
+      <h2><span class="step">4</span>编辑招呼语
+        <span class="spacer" style="flex:1"></span>
+        <span class="hint" id="editInfo"></span>
+        <a id="goSend" href="javascript:switchTab('send')" class="mini"
+           style="display:none; text-decoration:underline; white-space:nowrap; align-self:center">去发送 →</a>
+      </h2>
+
+      <div class="table" id="editWrap" style="display:none">
+        <div class="thead" id="editHead"></div>
+        <div id="editRows"></div>
+      </div>
+      <div id="editEmpty" class="empty">还没选岗位。去「二次筛选」勾选要投的，再回这里：招呼语可以让 agent 按你的知识库批量生成，也可以自己手动输入。</div>
+    </div>
+  </div>
+
+  <!-- ========== 页 5：发送（选方式 → 发送） ========== -->
+  <div class="page wp" id="pageSend">
+    <div class="card sendcard">
+      <h2><span class="step">5</span>发送</h2>
+
+      <div class="metrics">
+        <div class="metric"><p class="k">已勾选岗位</p><p class="v" id="mCand">0</p></div>
+        <div class="metric"><p class="k">已填进输入框</p><p class="v" id="mFilled" style="color:var(--accent)">0</p></div>
+        <div class="metric"><p class="k">已发出</p><p class="v" id="mSent" style="color:var(--accent)">0</p></div>
+        <div class="metric"><p class="k">跳过/失败</p><p class="v" id="mSkip" style="color:var(--ink-3)">0</p></div>
+      </div>
+
+      <div class="row sendrow">
+        <div class="seg" id="modes">
+          <button class="on" data-mode="fillOnly" onclick="pickMode('fillOnly')"
+            title="逐个把招呼语填进 BOSS 输入框就停下，绝不自动发送；填好后请尽快在浏览器里手动点发送，脚本再次运行或刷新 BOSS 页面，输入框里没发出去的招呼语会消失">放到输入框</button>
+          <button data-mode="auto" onclick="pickMode('auto')"
+            title="填好就自动发送，逐个连着跑；发出去之前没机会再过一眼">直接发送</button>
+        </div>
+        <button class="primary" id="btnSend" onclick="send()" disabled>开始处理选中的 0 个</button>
+        <span class="hint" id="sendHint">先去「二次筛选」勾选要投的岗位</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 页 6：发送记录 ========== -->
+  <div class="page wp" id="pageRecords">
+    <div class="card grow">
+      <h2><span class="step">6</span>记录</h2>
+      <div class="table rectable">
+        <div class="rghead">
+          <span>爬取</span><span>发送</span><span>放入输入框</span><span>下架</span>
+        </div>
+        <div class="rgrow">
+          <span><em>总</em><b id="stCollected">-</b></span>
+          <span><em>总</em><b id="stSent">-</b></span>
+          <span><em>总</em><b id="stFilled">-</b></span>
+          <span><em>总</em><b id="stOffline">-</b></span>
+        </div>
+        <div class="rgrow">
+          <span><em>今</em><b id="stCollectedT">-</b></span>
+          <span><em>今</em><b id="stSentT">-</b></span>
+          <span><em>今</em><b id="stFilledT">-</b></span>
+          <span><em>今</em><b id="stOfflineT">-</b></span>
+        </div>
+        <div class="rgtitle">
+          <span>时间</span><span>岗位</span><span>公司</span><span>状态</span>
+        </div>
+        <div id="records"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 页 7：设置（页签入口，2026-10-13 已定） ========== -->
+  <div class="page" id="pageSettings">
+    <div class="card">
+      <h2>设置</h2>
+      <div class="setwrap">
+        <!-- 招呼语提示词（2026-10-13 已定）：就一个按钮，点了在屏幕中间弹出大输入框编辑。
+             弹窗里的编辑不单独保存，关掉后跟设置页其余字段一起由「保存设置」提交 -->
+        <p class="absec">招呼语提示词</p>
+        <div id="promptBox" class="setprompt">
+          <button onclick="openPromptBox()">修改招呼语提示词</button>
+        </div>
+
+        <p class="absec">限额</p>
+        <div class="setgrid">
+          <div class="setrow"><span class="setk">一次最多爬</span>
+            <input type="number" id="setMaxJobsPerRun" min="1" max="30" oninput="setDirty()">
+            <span class="setu">个岗位（1~30）</span></div>
+          <div class="setrow"><span class="setk">一天最多爬</span>
+            <input type="number" id="setDailyCollectCap" min="1" max="300" oninput="setDirty()">
+            <span class="setu">个岗位（1~300）</span></div>
+          <div class="setrow"><span class="setk">一天最多发</span>
+            <input type="number" id="setDailyCap" min="1" max="200" oninput="setDirty()">
+            <span class="setu">条招呼语（1~200）</span></div>
+        </div>
+
+        <p class="absec">发送招呼语</p>
+        <div class="setgrid">
+          <div class="setrow"><span class="setk">大多数时候</span>
+            <input type="number" id="setDelayMinSec" min="1" max="60" step="0.5" oninput="setDirty()"> ~
+            <input type="number" id="setDelayMaxSec" min="1" max="120" step="0.5" oninput="setDirty()">
+            <span class="setu">秒</span></div>
+          <div class="setrow"><span class="setk">偶尔慢一点</span>
+            <input type="number" id="setDelayTailRatio" min="0" max="100" step="5" oninput="setDirty()">
+            <span class="setu">%</span>
+            <input type="number" id="setDelayTailMinSec" min="1" max="60" step="0.5" oninput="setDirty()"> ~
+            <input type="number" id="setDelayTailMaxSec" min="1" max="300" step="0.5" oninput="setDirty()">
+            <span class="setu">秒</span></div>
+          <div class="setrow"><span class="setk">沟通前在 JD 页面停留</span>
+            <input type="number" id="setClickPauseMinSec" min="0" max="5" step="0.1" oninput="setDirty()"> ~
+            <input type="number" id="setClickPauseMaxSec" min="0" max="10" step="0.1" oninput="setDirty()">
+            <span class="setu">秒</span></div>
+        </div>
+
+        <p class="absec">爬取岗位</p>
+        <div class="setgrid">
+          <div class="setrow"><span class="setk">大多数时候</span>
+            <input type="number" id="setCollectDelayMinSec" min="1" max="60" step="0.5" oninput="setDirty()"> ~
+            <input type="number" id="setCollectDelayMaxSec" min="1" max="120" step="0.5" oninput="setDirty()">
+            <span class="setu">秒</span></div>
+          <div class="setrow"><span class="setk">偶尔慢一点</span>
+            <input type="number" id="setCollectDelayTailRatio" min="0" max="100" step="5" oninput="setDirty()">
+            <span class="setu">%</span>
+            <input type="number" id="setCollectDelayTailMinSec" min="1" max="60" step="0.5" oninput="setDirty()"> ~
+            <input type="number" id="setCollectDelayTailMaxSec" min="1" max="300" step="0.5" oninput="setDirty()">
+            <span class="setu">秒</span></div>
+          <div class="setrow"><span class="setk">在 JD 页面停留</span>
+            <input type="number" id="setReadPauseMinSec" min="0" max="10" step="0.1" oninput="setDirty()"> ~
+            <input type="number" id="setReadPauseMaxSec" min="0" max="30" step="0.1" oninput="setDirty()">
+            <span class="setu">秒</span></div>
+          <div class="setrow"><span class="setk">停留时滚轮滑动</span>
+            <input type="number" id="setReadScrollMinPx" min="0" max="3000" step="50" oninput="setDirty()"> ~
+            <input type="number" id="setReadScrollMaxPx" min="0" max="5000" step="50" oninput="setDirty()">
+            <span class="setu">像素</span></div>
+        </div>
+
+        <p class="absec">候选池</p>
+        <div class="setprompt">
+          <button onclick="clearSent()">清理已发送的岗位（从候选池彻底删除，删除前自动备份）</button>
+        </div>
+
+        <!-- 保存/撤销：放在「恢复默认设置」旁边（2026-10-13 已定：不做底栏，就在这一行）
+             无改动时按钮置灰不可点，改动后自动点亮 —— 能看见按钮在哪，又不会误保存 -->
+        <div class="row setfoot">
+          <button id="btnResetSettings" onclick="resetSettings()">恢复默认设置</button>
+          <button class="primary" id="btnSaveSettings" onclick="saveSettings()" disabled>保存设置</button>
+          <button id="btnRevertSettings" onclick="revertSettings()" disabled>撤销改动</button>
+          <span class="setdirty" id="setDirtyHint">当前设置已保存</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 知识库页 ========== -->
+  <div class="page" id="pageKb">
+    <div class="card kbc" id="kbBox">
+      <div id="kbExampleNote" class="notecard" style="display:none">
+        当前显示的是<b>示例内容（虚构人物）</b>，请逐项改成你自己的真实信息，改完会自动保存。
+      </div>
+
+      <section class="kbblock">
+        <h3 class="kbsec"><span class="knum">1</span>我是谁</h3>
+        <div class="krow">
+          <textarea id="kIdentity" rows="3" oninput="kbTouch()" placeholder="例：计算机相关专业应届生，可实习6个月、每周5天，意向北京"></textarea>
+        </div>
+      </section>
+
+      <section class="kbblock">
+        <h3 class="kbsec"><span class="knum">2</span>我的经历</h3>
+        <div id="entries"></div>
+        <div class="row" style="margin-top:8px"><button onclick="addEntry()">+ 新增经历</button></div>
+      </section>
+
+      <section class="kbblock">
+        <h3 class="kbsec"><span class="knum">3</span>我的技能</h3>
+        <textarea id="kSkills" rows="3" oninput="kbTouch()" placeholder="例：Java、Spring Boot、Vue3、MySQL、Nginx、Linux、Git、接口测试"></textarea>
+      </section>
+    </div>
+  </div>
+
+</div>
+
+<!-- 运行日志：界面上已去掉（脚本仍写入这里，排查直接看 logs/run-*.log） -->
+<div class="logbox" id="logBox" hidden></div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 自定义确认框：原生 confirm 的按钮文案是浏览器定的（确定/取消）改不了，
+     这里做一个可指定按钮文案的（2026-10-13 已定：离开设置页要「保存 / 不保存」） -->
+<div class="ask" id="askBox" hidden>
+  <div class="askcard">
+    <div class="askmsg" id="askMsg"></div>
+    <div class="askbtns">
+      <button id="askNo"></button>
+      <button id="askYes" class="primary"></button>
+    </div>
+  </div>
+</div>
+
+<!-- 招呼语提示词编辑弹窗（2026-10-13 已定）：屏幕中间的大输入框，复用 .ask 遮罩样式。
+     「完成」保留改动（跟设置页一起保存）；「取消 / ESC / 点遮罩」还原成打开时的内容。
+     注意 id 是 promptModal —— promptBox 是设置页里那个按钮容器 -->
+<div class="ask" id="promptModal" hidden>
+  <div class="askcard wide">
+    <div class="askmsg">招呼语提示词</div>
+    <textarea id="promptText" spellcheck="false"></textarea>
+    <div class="askbtns" style="margin-top:14px">
+      <button style="margin-right:auto" onclick="fillPromptDefault()">恢复默认</button>
+      <button onclick="closePromptBox(false)">取消</button>
+      <button class="primary" onclick="closePromptBox(true)">完成</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/core.js" defer></script>
+<script src="/js/render.js" defer></script>
+<script src="/js/actions.js" defer></script>
+</body>
+</html>
