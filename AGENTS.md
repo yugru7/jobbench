@@ -38,13 +38,15 @@
 | `prompts/greeting.md` | **写招呼语前必读**：生成规则 + 写回方式。用户可在面板「设置」页 →「修改招呼语提示词」编辑 —— 以文件最新内容为准 |
 | `prompts/greeting.default.md` | 出厂默认招呼语提示词（设置页「恢复默认」会用它覆盖 `prompts/greeting.md`） |
 | `prompts/knowledge-interview.md` | **补知识库前必读**：访谈流程 + 红线 |
+| `prompts/collaboration.md` | **AI 协作规则**：分工模型 / 红线 / 工具面 / 开跑前必问清单 / 决策策略 / 已知坑（常规会话也适用） |
+| `prompts/automation.md` | 无人值守自动化完整 runbook（定时 / 批量投递，任务 D 的执行细节） |
 | `logs/run-*.log` | 每次运行的日志（排查问题先看它） |
 | `server.js` | 本地服务（端口 7788）：HTTP 接口、任务编排、静态文件。只监听 127.0.0.1，改完必须重启才生效 |
 | `greet.js` | 浏览器自动化主脚本（爬取 / 发送），一般不用改 |
 | `lib/` | 后端模块（**保持分文件**，不要把逻辑塞回 `greet.js`）：`args` 参数、`search` 搜索/意向、`page-helpers` 拟人操作、`greeting` 招呼语、`knowledge` 知识库、`blacklist` 黑名单、`lock` 单实例锁、`chrome-kill`、`utils` |
 | `public/` | 前端：`index.html` + `js/core.js`（状态与工具）→ `js/render.js`（渲染）→ `js/actions.js`（动作，按此顺序加载，全局函数互相调用）+ `style.css` |
 
-## 三个常见任务
+## 常见任务
 
 ### 任务 A：帮用户补全知识库
 1. 读 `knowledge.json`，看现在已有什么（首次使用可能没有这个文件 → 参考 `knowledge.example.json`）
@@ -80,6 +82,8 @@ node greet.js --mode=collect --keywords "前端开发实习" -n 10 --no-pause --
 - 服务端钳制：单次爬取 ≤30 个岗位、关键词 ≤10 个（传大参数会被静默压到上限）
 - 跑完用 `GET /api/collected` 或读 `logs/last-collect.json` 拿结果
 - 注意：爬取是浏览器自动化，一次要几十秒到几分钟，别重复触发
+
+### 任务 D：无人值守自动化（定时/批量投递）→ 完整 runbook 见 `prompts/automation.md`，协作规则与开跑前必问清单见 `prompts/collaboration.md`
 
 ### 发送（由用户主导，你只搭手）
 ```
@@ -148,6 +152,23 @@ POST /api/send
   - **现象**：面板发起的任务现在都带 `--use-cdp`；日志里出现「复用已在运行的调试 Chrome」「复用已有的 BOSS 标签页（下一轮就地翻页）」「浏览器已是热的（复用来的），跳过预热」；**每次跑任务都会复用同一个浏览器窗口和同一个标签页，只换页面内容**
   - **根因**：为了让"再爬一次"不再关掉浏览器又重开（费时、且像机器行为），`lib/runner.js` 给面板 spawn 的参数统一加了 `--use-cdp`；`lib/browser-session.js` 的 CDP 分支改为「复用已有 BOSS 标签页 + 收尾不关页面 + 只发 `browser-kept` 事件」。Chrome 是 detached（`--remote-debugging-port` + `unref`）起的，**node 进程退出浏览器不死**，所以任务结束后子进程直接退出，**不再有 1 小时保活**（保活只存在于命令行/独立模式）
   - **规避/解决**：① 「填进输入框、还没点发送」的招呼语会被下一轮的原地翻页冲掉 —— 想在窗口里手动补发送，就**先把这一批发完再开下一轮**；② 「关闭浏览器」现在没有子进程可发 CLOSE，改走 `killKeptBrowser()`（所以上面那条 BOM 修复是它的前提）；③ 命令行手敲 `node greet.js` 仍是独立模式（自己起浏览器），会和常驻的调试 Chrome 抢同一个 profile —— **面板开着时别混用**；④ 想回到旧行为：去掉 `--use-cdp` 即走独立模式
+
+- **expect 源的页签名：括号全/半角不一致 + 缓存会过期，精确匹配失败就静默 0 结果**
+  - **现象**：`POST /api/collect {source:"expect", expectTab:"某方向(某市)"}` 返回 `{"ok":true}`，但任务秒回 idle、新增 0；日志里是 `WARN 页签「某方向(某市)」不在你的意向里，终止`。
+  - **根因**：① `expectTab` 与 BOSS 页签**逐字精确匹配**，缓存里存的是半角 `(某市)`、BOSS 实际渲染的是全角 `（某市）`；② `logs/expects-cache.json` 是快照，用户改了 BOSS 简历期望城市后**新页签不会自动进缓存**（实测刷新后会多出未见过的新页签）。
+  - **规避/解决**：跑 expect 前先 `POST /api/expects { "force": true }` 强制刷新，再读 `logs/expects-cache.json` 的 `tabs` 拿**真实页签名**（别凭记忆写）；该 collect 调用可带 `cityCode`/`cityName` 覆盖 config 城市（实测 config 城市为 A 市、collect 传 B 市时，返回的全是 B 市岗位）。
+- **复刻面板二筛判据时，「只实习」别只认中文**
+  - **现象**：自动化在本地复刻「只实习」过滤后，把「Data Analytics Intern(001544)」这类实习岗误杀。
+  - **根因**：面板判据（`public/js/render.js` 的 `visibleCands`）匹配的是 `/实习|见习|应届|在校|校招/`，**英文 `Intern/Internship` 命名的实习岗不命中**。
+  - **规避/解决**：agent 复刻时补上 `Intern|Internship`，否则会比面板多丢岗位（这是"复刻判据"与"面板判据"的真实差异）。
+- **招呼语里的「数字/范围」类事实要回 `knowledge.json` 的 `entries` 明细核对，别从 `profile` 概括句直接取**
+  - **现象**：招呼语写「独立做过两个全栈项目并公网上线」，用户当场指出不对 —— 实际只有一个才是公网上线的全栈项目。
+  - **根因**：`profile.identity` 是一句**概括**（原话「独立完成过两个全栈项目从需求设计、技术选型、测试到公网部署上线的全流程」），它把「数量」和「属性」压缩在同一句里，未必与 `entries` 明细一致；照抄这句就等于把概括当事实用。
+  - **规避/解决**：写进招呼语的任何数字/范围（项目个数、代码行数、实习月数、并发数）都必须回 `entries` 逐条找到出处，`profile` 只用来定基调、**不能当事实源**；发现 `profile` 与 `entries` 冲突时停下来问用户，先改知识库再用。
+- **判断任务是否跑完，状态字段在 `bootstrap.state.status`，不在顶层**
+  - **现象**：无人值守脚本轮询 `GET /api/bootstrap` 等上一批任务跑完，写成 `(Invoke-RestMethod ...).status`，拿到 `$null`；`$null -ne 'running'` 为真 → 循环**第一轮就退出**，误以为任务已跑完，接着发下一批 → 撞单实例锁报「已有任务在跑」。
+  - **根因**：`/api/bootstrap` 的返回结构是 `{config, knowledge, cities, state, checkedUrls, lastCollect, dailyUsed}`，运行状态在 **`state.status`** 里（`routes/bootstrap.js` 第 18 行 `state: {...state}`），顶层没有 `status`。
+  - **规避/解决**：轮询用 `(Invoke-RestMethod ...).state.status`；且 `POST /api/collect`、`/api/send`、`/api/expects` 都是 `startChild` **spawn 后立即返回**（`lib/runner.js` 第 100 行 `return readable`），HTTP 200 **不代表任务已结束** —— 必须显式轮询到 `state.status` 离开 `running`/`stopping` 再发下一批。
 
 ## HTTP 接口速查（本地 7788）
 
