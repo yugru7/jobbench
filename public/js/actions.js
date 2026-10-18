@@ -6,7 +6,8 @@ let STARTING = false;   // 防连点：请求还没回来时再点会双开任�
 
 function collectHintFor(a) {
   return a.source === 'recommend' ? '正在爬取推荐岗位…'
-    : a.source === 'expect' ? `正在爬「${a.expectTab}」…` : '正在搜索岗位…';
+    : a.source === 'expect' ? `正在爬「${a.expectTab}」…`
+    : a.source === 'fav' ? '正在爬取收藏岗位…' : '正在搜索岗位…';
 }
 
 async function collect() {
@@ -50,21 +51,73 @@ function clampMaxJobs(el) {
 // loadIt=false 用于启动恢复：只还原界面，不真去读 BOSS（否则一开页面就弹浏览器）
 function applySource(v, loadIt) {
   $('btnCollect').textContent = v === 'recommend' ? '爬推荐岗位'
-    : v === 'expect' ? '爬意向岗位' : '搜索岗位';
-  // 投递方向（chips + 添加框）只有搜索模式用得到，推荐/意向页签都来自 BOSS 账号
+    : v === 'expect' ? '爬意向岗位'
+    : v === 'fav' ? '爬收藏岗位' : '搜索岗位';
+  // 投递方向（chips + 添加框）只有搜索模式用得到，推荐/意向页签/收藏都来自 BOSS 账号
   const useKw = v === 'search';
   $('kwRow').style.display = useKw ? '' : 'none';
   $('expectRow').style.display = v === 'expect' ? '' : 'none';
-  // 城市定位：意向方向的页签来自 BOSS 简历期望城市（页签后缀自带），定位选择对它无意义
-  $('cityRow').style.display = v === 'expect' ? 'none' : '';
+  // 城市定位：意向方向的页签来自 BOSS 简历期望城市（页签后缀自带）、收藏是账号里已收藏的岗位
+  // —— 定位选择对它俩都无意义（收藏更是完全不吃，lib/search.js 用固定收藏 URL）
+  $('cityRow').style.display = (v === 'expect' || v === 'fav') ? 'none' : '';
   $('collectHint').textContent = v === 'recommend' ? '按你在 BOSS 里勾选的意向岗位推荐，不用选投递方向'
-    : v === 'expect' ? '先去「岗位初筛」页挑一个意向方向' : '';
+    : v === 'expect' ? '先去「岗位初筛」页挑一个意向方向'
+    : v === 'fav' ? '爬你 BOSS 账号里收藏的岗位，不套城市 / 经验 / 筛选条件' : '';
+  renderSourceNav();
+  renderFilterNav();   // 来源变了：筛选组跟着变，重建
   if (v === 'expect' && loadIt) loadExpects();
 }
 function onSourceChange() {
   const v = $('collectSource').value;
-  savePref('source', v);   // 记住来源（2026-10-13：刷新/重启后不变）
+  savePref('source', v);   // 记住来源（刷新/重启后不变）
   applySource(v, true);
+}
+
+// ---------- 岗位初筛：来源 chip 导航栏 + 筛选条件 ----------
+// 来源 chip：写进隐藏 select 后走原有 onSourceChange（记住来源 + applySource）。
+function pickSource(v) {
+  const sel = $('collectSource');
+  if (!sel) return;
+  if (sel.value === v) { renderSourceNav(); return; }
+  sel.value = v;
+  onSourceChange();
+}
+// 选 / 取消一个选项（clear=true 时表示「不限」→ 清空该项）。
+// 默认多选（BOSS 支持逗号多选，存「码串」如 404,405）；single 组（如求职类型）互斥，直接替换。
+function toggleFilterValue(key, code, clear) {
+  const src = curSource();
+  // 经验要求是「全局」设置（存 config.experience），不走 sourceFilters —— 单独处理
+  if (key === 'experience') {
+    const cur = EXP_CODES.slice();
+    if (clear) saveExperience('');
+    else { const i = cur.indexOf(code); if (i >= 0) cur.splice(i, 1); else cur.push(code); saveExperience(cur.join(',')); }
+    renderFilterNav();
+    return;
+  }
+  SOURCE_FILTERS[src] = SOURCE_FILTERS[src] || {};
+  if (clear) SOURCE_FILTERS[src][key] = '';
+  else if ((FILTER_GROUPS.find(g => g.key === key) || {}).single) {
+    // 互斥组：点已选中的再点一次 = 取消（回到不限），否则直接替换成新值
+    SOURCE_FILTERS[src][key] = pickedCodes(src, key).includes(code) ? '' : code;
+  } else {
+    const cur = pickedCodes(src, key);
+    const i = cur.indexOf(code);
+    if (i >= 0) cur.splice(i, 1); else cur.push(code);
+    SOURCE_FILTERS[src][key] = cur.join(',');
+  }
+  // 「多来源共有」的筛选（求职类型/学历/规模/融资）：全局一份 —— 把新值同步到其它来源，
+  // 保证「切来源时不变」（工作区域只有搜索有，不在此列）
+  const g = FILTER_GROUPS.find(x => x.key === key);
+  if (isSharedGroup(g)) {
+    for (const s of FILTER_SOURCES) { SOURCE_FILTERS[s] = SOURCE_FILTERS[s] || {}; SOURCE_FILTERS[s][key] = SOURCE_FILTERS[src][key]; }
+  }
+  saveSourceFilters();
+  renderFilterNav();
+}
+// 写回 config.json（各来源分别保存；collect 时由 lib/search.js 拼进 BOSS URL）
+function saveSourceFilters() {
+  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sourceFilters: SOURCE_FILTERS }) }).catch(() => {});
 }
 
 // 读 BOSS 账号里勾选的求职方向（结果经 SSE 事件 t:'expects' 回来渲染 chips）
@@ -105,7 +158,7 @@ async function send() {
   if (!r.ok) { $('sendHint').textContent = ''; toast(r.error || '启动失败'); return; }
   toast(SEND_MODE === 'fillOnly' ? '开始填进输入框（不会发送）' : '开始发送');
 }
-// 停止 = 直接终止脚本（2026-10-13 已定稿）：没爬完的不爬、没发完的不发。
+// 停止 = 直接终止脚本：没爬完的不爬、没发完的不发。
 // 后端收到 STOP 后在最近的检查点干净收尾（预热/岗位之间都能及时响应）。
 async function stop() { await api('/api/stop', { method: 'POST' }); toast('正在停止…'); }
 
@@ -122,7 +175,7 @@ async function clearSent() {
   toast(`已清理 ${sentCount} 个已发送岗位`);
 }
 
-// 删除「获取岗位」页勾选的岗位（2026-10-16 加）：从候选池彻底删除，服务端删除前自动备份 .bak。
+// 删除「获取岗位」页勾选的岗位：从候选池彻底删除，服务端删除前自动备份 .bak。
 // 勾选用的是 FETCH_SEL（与二筛的 CHECKED 各自独立）—— 这里勾的是"不想要的"，不是"不投的"。
 async function deleteSelected() {
   const urls = [...FETCH_SEL];
@@ -138,7 +191,7 @@ async function deleteSelected() {
   toast(`已删除 ${r.removed != null ? r.removed : urls.length} 个岗位`);
 }
 
-// ---------- 招呼语提示词（设置页按钮 → 屏幕中间大输入框，2026-10-13 已定）----------
+// ---------- 招呼语提示词（设置页按钮 → 屏幕中间大输入框）----------
 // 写回 prompts/greeting.md（agent 和自动生成共用）。弹窗里的编辑不单独保存：
 // 点「完成」关掉后跟设置页其余字段一起由「保存设置」提交。
 let PROMPT_OPEN_TEXT = '';   // 打开弹窗时的内容，「取消」用它还原
@@ -151,7 +204,7 @@ async function loadPrompt() {
 function openPromptBox() {
   PROMPT_OPEN_TEXT = $('promptText').value;
   $('promptModal').hidden = false;
-  // 打开时显示最上面（2026-10-13 已定）：el.value 设值后光标默认在末尾，
+  // 打开时显示最上面：el.value 设值后光标默认在末尾，
   // focus() 会把视图滚到光标处 → 一开就在底部。先聚焦再把光标/滚动条收回开头。
   const ta = $('promptText');
   ta.focus();
@@ -194,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ---------- 设置页（2026-10-13 已定：限额 / 间隔 / 防护参数开放给用户） ----------
+// ---------- 设置页（限额 / 间隔 / 防护参数开放给用户） ----------
 // 设置页字段表：id = set + 首字母大写的 config 键。集中一处，加新参数改这里 + index.html 即可
 // 注意：显示层的单位做了「说人话」转换 —— 界面填「秒 / 百分数」，config 里存
 // 「毫秒 / 0~1 小数」（脚本按毫秒用）。转换只在这一层做，config 与脚本零改动。
@@ -246,7 +299,7 @@ function fillSettings(cfg) {
   }
 }
 
-// ---------- 保存语义（2026-10-13 已定：手动点保存，不再改动即保存）----------
+// ---------- 保存语义（手动点保存，不再改动即保存）----------
 // SET_SAVED = 服务端最后一次确认的生效值（config 单位）；SET_DIRTY = 有未保存改动。
 // 有未保存改动时：切页签 / 关页面都会先问一句，别让用户白填。
 let SET_SAVED = null;
@@ -270,7 +323,7 @@ function markSaved(cfg) {
   updateSetBar();
 }
 
-// ---------- 未保存草稿持久化（2026-10-13 已定：本页刷新不丢未保存改动）----------
+// ---------- 未保存草稿持久化（本页刷新不丢未保存改动）----------
 // 存"界面原值"（未换算），刷新后原样回填；只要出现未保存改动就写，
 // 保存 / 撤销 / 放弃（切页签选"不保存"）时清。
 // 用 sessionStorage（不是 localStorage）：同一标签页刷新能留住，关掉标签页就没了——
@@ -304,7 +357,7 @@ function restoreDraft() {
   updateSetBar();
 }
 
-// 底部操作行：按钮常驻（2026-10-13 反馈"按钮还是没有"——之前做成"改了才出现"
+// 底部操作行：按钮常驻（反馈"按钮还是没有"——之前做成"改了才出现"
 // 等于没有按钮）。现在只切按钮可用性与提示文案，不隐藏任何东西。
 function updateSetBar() {
   const dirty = SET_DIRTY && !setSaving;
@@ -325,8 +378,8 @@ async function loadSettings() {
     fillSettings(r.config);
     markSaved(r.config);
   }
-  await loadPrompt();    // 提示词也归设置页了（2026-10-13 已定）
-  restoreDraft();        // 上次刷新前留下的未保存草稿 → 原样恢复（2026-10-13 已定）
+  await loadPrompt();    // 提示词也归设置页了
+  restoreDraft();        // 上次刷新前留下的未保存草稿 → 原样恢复
 }
 
 // 「撤销改动」= 丢弃未保存草稿，回到服务端已保存的值（也会清掉刷新用的草稿）
@@ -337,7 +390,7 @@ function revertSettings() { clearDraft(); loadSettings(); }
 async function saveSettings() {
   if (setSaving) return;
 
-  // —— 前端预校验（2026-10-13 全面补）——
+  // —— 前端预校验 ——
   // 后端 clamp 兜底，但用户填 10000 进"发送间隔上限"被压成 120 后界面会变，他会懵。
   // 所以前端直接拦，让他当场改。
 
@@ -408,7 +461,7 @@ async function saveSettings() {
   setSaving = true;
   updateSetBar();
   try {
-    // 提示词跟着一起提交（2026-10-13 已定：提示词不单独出保存按钮，共用这一套）
+    // 提示词跟着一起提交（提示词不单独出保存按钮，共用这一套）
     const [rc, rp] = await Promise.all([
       api('/api/config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -420,7 +473,7 @@ async function saveSettings() {
     if (!rp || rp.ok !== true) { toast((rp && rp.error) || '提示词保存失败，其余设置已保存'); updateSetBar(); return; }
     if (rc.config) { fillSettings(rc.config); markSaved(rc.config); }
     else { markSaved(collectSettings()); }
-    clearDraft();   // 已落盘，草稿没用了（2026-10-13 已定）
+    clearDraft();   // 已落盘，草稿没用了
     // 单次爬取上限变了 → 获取岗位页的输入框 max/value 跟着走
     if (rc.config && $('maxJobs')) {
       const cap = Math.min(Math.max(parseInt(rc.config.maxJobsPerRun, 10) || 10, 1), 30);
@@ -443,7 +496,7 @@ async function resetSettings() {
   else toast('恢复失败');
 }
 
-// 离开设置页时的拦截（2026-10-13 已定：按钮是「保存 / 不保存」，不是确定/取消）。
+// 离开设置页时的拦截（按钮是「保存 / 不保存」，不是确定/取消）。
 //   保存   → 先落盘再离开（明确要保存，就该存）
 //   不保存 → 放弃改动直接走
 // 返回 true = 可以离开；false = 留在设置页
@@ -458,7 +511,7 @@ async function confirmLeaveSettings() {
 // ---------- 页签切换（知识库 + 工作台六步） ----------
 const PAGES = { about: 'pageAbout', how: 'pageHow', kb: 'pageKb', dir: 'pageDir', fetch: 'pageFetch', filter: 'pageFilter', edit: 'pageEdit', send: 'pageSend', records: 'pageRecords', settings: 'pageSettings' };
 // remember=false 时不写 localStorage（启动恢复用，别把默认值写死成"用户选择"）
-// 变async：离开设置页时要等用户在「保存 / 不保存」弹窗里做选择（2026-10-13 已定）
+// 变async：离开设置页时要等用户在「保存 / 不保存」弹窗里做选择
 async function switchTab(name, remember) {
   const id = PAGES[name] || 'pageDir';
   name = Object.keys(PAGES).find((k) => PAGES[k] === id);
@@ -467,7 +520,7 @@ async function switchTab(name, remember) {
   const curPage = document.querySelector('.page.on');
   const leavingSettings = curPage && curPage.id === 'pageSettings' && id !== 'pageSettings';
   if (leavingSettings && SET_DIRTY && !(await confirmLeaveSettings())) return;
-  // 离开知识库页时，把还没到点的那一笔立刻写出去（边写边存，2026-10-13 已定）
+  // 离开知识库页时，把还没到点的那一笔立刻写出去（边写边存）
   if (curPage && curPage.id === 'pageKb' && id !== 'pageKb') kbFlush();
   document.querySelectorAll('.page').forEach(el => el.classList.toggle('on', el.id === id));
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('on', el.dataset.tab === name));
@@ -475,7 +528,7 @@ async function switchTab(name, remember) {
   if (leavingSettings) { SET_DIRTY = false; updateSetBar(); }
   if (id !== 'pageSettings' && SET_DIRTY) { SET_DIRTY = false; updateSetBar(); }
   if (id === 'pageFetch') renderFetchRows();   // 进页面刷新计数/空态
-  if (id === 'pageEdit') renderEditRows();     // 提示词编辑区已移到「设置」页（2026-10-13 已定）
+  if (id === 'pageEdit') renderEditRows();     // 提示词编辑区已移到「设置」页
   if (id === 'pageSettings') loadSettings();   // 设置页：参数 + 提示词
   if (id === 'pageRecords') renderRecords();
   if (remember !== false) { try { localStorage.setItem('tab', name); } catch (_) {} }
@@ -534,7 +587,7 @@ function renderEntries() {
 function addEntry() { K.entries.push({ title: '', content: '' }); renderEntries(); kbTouch(); }
 function delEntry(i) { if (confirm('删除这条经历？')) { K.entries.splice(i, 1); renderEntries(); kbTouch(); } }
 
-// ---------- 知识库：边写边存（2026-10-13 已定，方案 B）----------
+// ---------- 知识库：边写边存（方案 B）----------
 // 去掉「保存知识库」按钮：任何改动停手约 0.9 秒后静默写入 knowledge.json。
 // 存的是服务端文件，所以刷新 / 切页签 / 关掉面板都不会丢。
 // 静默 = 成功不弹 toast（已定：不要状态提示），失败才提示。
@@ -586,11 +639,11 @@ switchTab(savedTab || 'dir', false);
 boot().then(() => {
   if (!savedTab && BOOT.knowledge && BOOT.knowledge._isExample) switchTab('kb', false);
   connect(); renderRecords();
-  // 【2026-10-13 已定】不再挂 beforeunload：未保存改动已落 sessionStorage 草稿，
+  // 不再挂 beforeunload：未保存改动已落 sessionStorage 草稿，
   // 本页刷新会自动恢复（loadSettings → restoreDraft），所以不需要"重新加载站点？"这个原生弹窗。
   // 切页面仍有页内「保存 / 不保存」询问；选「不保存」才丢弃草稿、还原成改动前。
 }).catch(e => {
-  // 【2026-10-13 已定】错误分两种走法：
+  // 错误分两种走法：
   //   ① bootstrap 都拿不到（服务没起来 / 面板被双击打开）→ 整页引导卡片：
   //      这时界面确实没数据可用，得明确告诉用户怎么启动服务；
   //   ② 服务是通的、只是初始化某一步抛错 → 只在标题后红字提示，页面主体照常。

@@ -28,6 +28,7 @@ module.exports = (deps) => {
     'POST /api/resume': require('./resume')(deps),
     'POST /api/stop': require('./stop')(deps),
     'POST /api/close-browser': require('./close-browser')(deps),
+    'POST /api/open-browser': require('./open-browser')(deps),
 
     'GET /api/knowledge': knowledge,
     'POST /api/knowledge': knowledge,

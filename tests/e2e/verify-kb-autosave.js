@@ -1,5 +1,5 @@
 /**
- * 回归：知识库「边写边存」（2026-10-13 已定，方案 B：去掉保存按钮，改动自动落盘）
+ * 回归：知识库「边写边存」（方案 B：去掉保存按钮，改动自动落盘）
  * 用法：先启动 server.js，再 node tests/verify-kb-autosave.js
  *
  * 覆盖：
@@ -13,8 +13,8 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const DIR = path.join(__dirname, '..', '..');
-const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
-const KNOW = path.join(DIR, 'knowledge.json');
+const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
+const KNOW = path.join(DIR, 'data', 'knowledge.json');
 let chromium;
 try { ({ chromium } = require('patchright')); } catch (_) { ({ chromium } = require('playwright-core')); }
 const { CHROME, sleep } = require('../../lib/utils');

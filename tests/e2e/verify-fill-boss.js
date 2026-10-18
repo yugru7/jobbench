@@ -15,7 +15,7 @@ const DIR = path.join(__dirname, '..', '..');
 
 let chromium;
 try { ({ chromium } = require('patchright')); } catch (_) { ({ chromium } = require('playwright-core')); }
-const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8').replace(/^\uFEFF/, ''));
+const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8').replace(/^\uFEFF/, ''));
 const { CHROME, sleep } = require('../../lib/utils');
 const { clickGreetButton, fillGreeting } = require('../../lib/page-helpers');
 const { killChromeUsingProfile } = require('../../lib/chrome-kill')(CFG.profileDir, path.join(DIR, 'logs'));

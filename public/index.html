@@ -11,12 +11,12 @@
 <header>
   <div class="wrap">
     <h1>求职助手</h1>
-    <!-- 启动异常红字提示（2026-10-13 已定）：初始化出错只在标题后红字说明，
+    <!-- 启动异常红字提示：初始化出错只在标题后红字说明，
          不把整页替换成错误卡片 —— 页面主体还能正常用 -->
     <span class="hdr-err" id="hdrError" style="display:none"></span>
     <span class="badge" id="statusBadge">读取中</span>
-    <span class="badge" id="browserBadge" style="display:none">浏览器开着</span>
-    <button class="sm" id="btnCloseBrowser" style="display:none" onclick="closeBrowser()">关闭浏览器</button>
+    <button class="sm" id="btnOpenBrowser" onclick="openBrowser()">打开 BOSS</button>
+    <button class="sm" id="btnCloseBrowser" style="display:none" onclick="closeBrowser()">关闭 BOSS</button>
     <span class="spacer"></span>
   </div>
 </header>
@@ -77,7 +77,7 @@
 
         <p class="absec">它能做什么（六步链路）</p>
         <p class="abli"><b>1 备好知识库</b>：填「我是谁 / 我的经历 / 我的技能」，也可让 agent 访谈式帮你补全；它是招呼语取材的唯一来源</p>
-        <p class="abli"><b>2 岗位初筛</b>：来源（搜索 / 推荐 / 意向方向）、城市、单次数量；搜索模式下填投递关键词</p>
+        <p class="abli"><b>2 岗位初筛</b>：来源（搜索 / 推荐 / 意向方向 / 收藏）、城市、单次数量；搜索模式下填投递关键词</p>
         <p class="abli"><b>3 爬岗位</b>：自动逐个打开岗位页，读出 JD、薪资、招聘者活跃度、公司规模与行业，进候选池</p>
         <p class="abli"><b>4 二次筛选</b>：按类型 / 活跃度 / 薪资 / 规模 / 行业 / 双休过滤排序，勾选要投的；也可让 agent 智能评分勾选</p>
         <p class="abli"><b>5 写招呼语</b>：勾选岗位逐条生成定制版（对准这条 JD，不是群发模板），可手改，自动保存</p>
@@ -94,13 +94,14 @@
         <p class="abli"><b>来源层</b>：面板与接口只受理来自本机的请求（Host / Origin 白名单，只认 127.0.0.1 / localhost）。恶意网页打不开你的接口，伪装域名（DNS 重绑定）也读不到你的知识库、清不掉你的候选池；命令行与 agent 正常调用不受影响</p>
         <p class="abli"><b>驱动层</b>：用 Patchright（Playwright 的反检测分支），不产生 CDP 自动化痕迹；跑的是你自己的 Chrome 配置目录，指纹与登录态都是真实的</p>
         <p class="abli"><b>行为层</b>：点击带鼠标轨迹与随机落点（含真实按压时长）、滚动有速度包络与微动、招呼语分块粘贴模拟人工输入、看岗位有停顿（默认停留 1~2 秒、滚轮滑动 300~700 像素）、岗位间隔随机：爬取默认 4~7 秒（约 25% 概率进入 7~11 秒的「偶尔慢一点」）、发送默认 4~6 秒（约 25% 概率进入 6~12 秒）</p>
-        <p class="abli"><b>预热</b>：每次任务开头先随机打开一个常见网站（百度 / 必应 / 网易 里随机选一个）停留一两秒，再进 BOSS。既让首页渲染完整（不预热容易只加载出一两张卡片），也避免「直奔目标站」这种脚本特征</p>
+        <p class="abli"><b>预热</b>：全新启动浏览器时，任务开头会随机打开一个常见网站（百度 / 必应 里随机选一个）停留一两秒，再进 BOSS。既让首页渲染完整（不预热容易只加载出一两张卡片），也避免「直奔目标站」这种脚本特征；浏览器已是热的（复用来的）则直接跳过预热</p>
         <p class="abli"><b>限额层</b>：每日发送上限（默认 60）、每日爬取上限（默认 80）、单次爬取上限（少量多次，服务端硬顶 30）；发送时按当日剩余额度自动截断</p>
         <p class="abli"><b>流程层</b>：默认「只填不发」；「直接发送」必须你本人在面板上亲自确认；遇到安全验证会停下等你人工完成；反复失败的岗位进黑名单不再触碰</p>
 
         <p class="absec">数据放在哪（都在本地）</p>
-        <p class="abli"><b>config.json</b>：爬取 / 发送 / 节奏等设置，以及城市</p>
-        <p class="abli"><b>knowledge.json</b>：你的知识库（我是谁 / 我的经历 / 我的技能）</p>
+        <p class="abli"><b>data/config.json</b>：爬取 / 发送 / 节奏等设置，以及城市</p>
+        <p class="abli"><b>data/knowledge.json</b>：你的知识库（我是谁 / 我的经历 / 我的技能）</p>
+        <p class="abli"><b>data/cities.json / data/filters.json</b>：城市列表 / 岗位初筛筛选项（下拉与筛选条件的数据源）</p>
         <p class="abli"><b>prompts/greeting.md</b>：招呼语提示词（设置页可改，可一键恢复默认）</p>
         <p class="abli"><b>logs/last-collect.json</b>：候选池（跨批次累积、按岗位去重）</p>
         <p class="abli"><b>logs/</b>：运行日志（run-*.log）、记录统计（stats.json）、已打招呼明细（已打招呼记录.txt）、黑名单（黑名单.txt）、勾选副本（checked.json）</p>
@@ -123,6 +124,7 @@
       <div class="abwrap">
         <p class="absec">第一次用</p>
         <p class="abp">双击 <b>启动.bat</b>，浏览器自动打开面板 http://127.0.0.1:7788；在弹出的浏览器里扫码登录 BOSS，<b>一次即可</b>，之后长期复用（独立配置目录，不影响你日常用的 Chrome）。没有其他安装步骤。</p>
+        <p class="abli"><b>建议首次使用先点顶栏的「打开 BOSS」</b>：它用任务同款浏览器（同一份登录态）打开 BOSS，扫码登录一次即可、之后长期复用；登好再回来点爬取 / 发送，就不会跑到一半被踢回登录页。</p>
         <p class="abli">面板打不开 = 服务没跑起来，重新双击 启动.bat 即可，不用重装</p>
 
         <p class="absec">① 个人经历知识库</p>
@@ -132,15 +134,16 @@
         <p class="abli">只填真实做过的事：招呼语会被 HR 逐字看到，面试可能被追问</p>
 
         <p class="absec">② 岗位初筛</p>
-        <p class="abli"><b>来源三选一</b>：搜索（按你填的关键词搜）、推荐（BOSS 给你推的）、意向方向（你在 BOSS 上勾选的求职方向，点「刷新方向」可重新同步）</p>
+        <p class="abli"><b>来源四选一</b>：搜索（按你填的关键词搜）、推荐（BOSS 给你推的）、意向方向（你在 BOSS 上勾选的求职方向，点「刷新方向」可重新同步）、收藏（你在 BOSS 收藏的岗位，不套城市与筛选）</p>
         <p class="abli"><b>城市</b>：省份 → 城市两级，全国 373 城；选定立即保存，搜索与推荐都严格按这个城市定位</p>
         <p class="abli">注意例外：<b>「意向方向」来源跟的是你 BOSS 简历里的期望城市</b>，不受面板城市影响；页签后缀（如「(北京)」）才是实际城市，不对就去 BOSS 改简历期望城市</p>
+        <p class="abli"><b>「收藏」来源拉的是你 BOSS 账号里收藏的岗位</b>，同样不套面板城市、经验与筛选条件（都是你自己挑进收藏的，不再过一遍机器门槛）；这些岗位在列表里<b>岗位名前带「★」并默认勾选</b>（视同已过二筛，agent 不再重判匹配度，但仍会照常写招呼语）</p>
         <p class="abli"><b>岗位数量</b>：单次爬多少个，默认 10（少量多次）</p>
         <p class="abli"><b>投递方向</b>：搜索模式下填关键词；<b>一次只爬一个方向</b>（避免跑偏），再加一个会替换掉上一个</p>
 
         <p class="absec">③ 获取岗位</p>
-        <p class="abli">点「搜索岗位 / 爬推荐岗位 / 爬意向岗位」启动浏览器自动化，逐个打开岗位详情页，自动读出 <b>JD 正文、薪资、招聘者活跃度、公司规模、行业</b></p>
-        <p class="abli">爬完进<b>候选池</b>：跨批次累积、按岗位去重（重复的不占名额，自动补足目标数量）；你改过的招呼语和勾选绝不会被重爬覆盖</p>
+        <p class="abli">点「搜索岗位 / 爬推荐岗位 / 爬意向岗位 / 爬收藏岗位」启动浏览器自动化，逐个打开岗位详情页，自动读出 <b>JD 正文、薪资、招聘者活跃度、公司规模、行业</b></p>
+        <p class="abli">爬完进<b>候选池</b>：跨批次累积、按岗位去重（重复的不占名额，自动补足目标数量）；<b>加载深度按需</b>——按你要的数量自动决定翻页 / 滚动到哪，够了就停，不把隐藏的岗位一次性全抓完；你改过的招呼语和勾选绝不会被重爬覆盖</p>
         <p class="abli"><b>候选池里是「爬取那一刻」的快照</b>：BOSS 上这些岗位会实时变动（招满、下架、改要求），本工作台看不到后续变化；建议爬到的岗位<b>尽早发送</b>，别囤太久</p>
         <p class="abli">任务运行时顶栏显示「运行中」，可随时点「停止」（直接终止，没爬完的就不再爬）</p>
         <p class="abli">「删除选中」删除前会自动备份到 <b>logs/last-collect.json.bak</b>；就算 agent 在命令行偷偷爬，面板也能检测到并自动并入候选池</p>
@@ -195,35 +198,32 @@
   <div class="page wp" id="pageDir">
     <div class="card">
       <h2><span class="step">1</span>岗位初筛</h2>
-      <div class="row" style="margin-bottom:10px">
+      <div class="row" style="margin-bottom:8px">
         <label class="fld">来源</label>
-        <select id="collectSource" onchange="onSourceChange()">
+        <!-- 来源那行改成 chip 导航栏。原生 select 保留但隐藏，
+             继续当「状态源」（旧代码/事件都读它的 value），由 chips 驱动切换。 -->
+        <select id="collectSource" onchange="onSourceChange()" style="display:none">
           <option value="search">搜索（通过 BOSS 搜出来的岗位）</option>
           <option value="recommend">推荐（BOSS 给你推荐的）</option>
           <option value="expect">意向岗位（你在 BOSS 勾选的方向）</option>
+          <option value="fav">收藏（你在 BOSS 收藏的岗位）</option>
         </select>
+        <div class="chips" id="sourceChips"></div>
       </div>
-      <div class="row" id="cityRow" style="margin-bottom:10px">
+      <!-- 省份 / 城市（搜索/推荐来源下，省份/城市在「筛选」上方；
+           意向来源对城市无意义，由 applySource 隐藏本行） -->
+      <div class="row" id="cityRow" style="margin-bottom:8px">
         <label class="fld">省份</label>
         <select id="provSel" style="min-width:130px"></select>
         <label class="fld" style="margin-left:14px">城市</label>
         <select id="citySel" style="min-width:130px"></select>
       </div>
+      <!-- 筛选条件：每项各占一行，「标签 + 全部选项」常显，不用点开；
+           随来源变化（搜索多一项「工作区域」）。选中的值直接拼进 BOSS 列表页 URL 从源头过滤。 -->
+      <div id="filterBox"></div>
       <div class="row" style="margin-bottom:10px">
-        <label class="fld">岗位数量</label>
+        <label class="fld">一次爬取的岗位数量</label>
         <input type="number" id="maxJobs" min="1" max="10" value="10" style="width:110px" title="单次最多爬多少个岗位（少量多次：一天可以多爬几轮）" oninput="clampMaxJobs(this)">
-      </div>
-      <div class="row" style="margin-bottom:10px">
-        <label class="fld">经验要求</label>
-        <select id="experienceSel" onchange="saveExperience(this.value)" style="min-width:160px" title="BOSS 的经验档位筛选，留空 = 不限">
-          <option value="">不限（返回全部经验档）</option>
-          <option value="108">在校生 · 应届</option>
-          <option value="101">1年以下</option>
-          <option value="102">1-3年</option>
-          <option value="103">3-5年</option>
-          <option value="104">5-10年</option>
-          <option value="105">10年以上</option>
-        </select>
       </div>
       <div class="row" id="kwRow" style="margin-bottom:10px">
         <label class="fld">投递方向</label>
@@ -246,7 +246,7 @@
       <h2><span class="step">2</span>获取岗位 <span class="hint" id="fetchInfo" style="flex:1; text-align:right"></span></h2>
       <div class="row" style="margin-bottom:10px">
         <button class="primary" id="btnCollect" onclick="collect()">搜索岗位</button>
-        <!-- 「停止」只在任务运行时出现（2026-10-13 已定稿：点了直接终止脚本，
+        <!-- 「停止」只在任务运行时出现（点了直接终止脚本，
              不要暂停/继续这套） -->
         <button id="btnStop" onclick="stop()" disabled style="display:none">停止</button>
         <span class="hint" id="collectHint"></span>
@@ -272,13 +272,8 @@
         <span class="hint" id="selInfo">已选 0 个</span>
       </h2>
 
-      <div class="row" style="margin-bottom:8px">
-        <label class="fld">类型</label>
-        <select id="fType" onchange="renderRows()" style="min-width:96px">
-          <option value="">不限</option>
-          <option value="intern">仅实习/校招</option>
-          <option value="full">仅全职</option>
-        </select>
+      <!-- 二次筛选条：全部控件并成一排（窄屏会按 .row 的 flex-wrap 自动折行） -->
+      <div class="row" style="margin-bottom:10px">
         <label class="fld">活跃度</label>
         <select id="fActive" onchange="renderRows()" style="min-width:140px">
           <option value="">不限</option>
@@ -294,26 +289,8 @@
         <label class="fld">日薪下限</label>
         <input type="number" id="fSal" placeholder="如 150" style="width:92px" oninput="renderRows()"
           title="按天折算比较，月薪会自动换算成日薪；工资没解析出来的岗位不受影响">
-      </div>
-      <div class="row" style="margin-bottom:10px">
-        <label class="fld">规模</label>
-        <select id="fSize" onchange="renderRows()" style="min-width:126px">
-          <option value="">不限</option>
-          <option value="0-20人">0-20人</option>
-          <option value="20-99人">20-99人</option>
-          <option value="100-499人">100-499人</option>
-          <option value="500-999人">500-999人</option>
-          <option value="1000-9999人">1000-9999人</option>
-          <option value="10000人以上">10000人以上</option>
-        </select>
         <label class="fld">行业含</label>
         <input type="text" id="fInd" placeholder="如：互联网" style="width:120px" oninput="renderRows()">
-        <label class="fld">排序</label>
-        <select id="fSort" onchange="renderRows()" style="min-width:100px">
-          <option value="">默认</option>
-          <option value="active">活跃度优先</option>
-          <option value="salary">薪资优先</option>
-        </select>
         <button class="sm" onclick="quickPick()">按筛选结果全选</button>
         <button class="sm" onclick="clearPick()">清空勾选</button>
         <span class="hint" id="filterInfo"></span>
@@ -398,12 +375,12 @@
     </div>
   </div>
 
-  <!-- ========== 页 7：设置（页签入口，2026-10-13 已定） ========== -->
+  <!-- ========== 页 7：设置（页签入口） ========== -->
   <div class="page" id="pageSettings">
     <div class="card">
       <h2>设置</h2>
       <div class="setwrap">
-        <!-- 招呼语提示词（2026-10-13 已定）：就一个按钮，点了在屏幕中间弹出大输入框编辑。
+        <!-- 招呼语提示词：就一个按钮，点了在屏幕中间弹出大输入框编辑。
              弹窗里的编辑不单独保存，关掉后跟设置页其余字段一起由「保存设置」提交 -->
         <p class="absec">招呼语提示词</p>
         <div id="promptBox" class="setprompt">
@@ -468,7 +445,7 @@
           <button onclick="clearSent()">清理已发送的岗位（从候选池彻底删除，删除前自动备份）</button>
         </div>
 
-        <!-- 保存/撤销：放在「恢复默认设置」旁边（2026-10-13 已定：不做底栏，就在这一行）
+        <!-- 保存/撤销：放在「恢复默认设置」旁边（不做底栏，就在这一行）
              无改动时按钮置灰不可点，改动后自动点亮 —— 能看见按钮在哪，又不会误保存 -->
         <div class="row setfoot">
           <button id="btnResetSettings" onclick="resetSettings()">恢复默认设置</button>
@@ -515,7 +492,7 @@
 <div class="toast" id="toast"></div>
 
 <!-- 自定义确认框：原生 confirm 的按钮文案是浏览器定的（确定/取消）改不了，
-     这里做一个可指定按钮文案的（2026-10-13 已定：离开设置页要「保存 / 不保存」） -->
+     这里做一个可指定按钮文案的（离开设置页要「保存 / 不保存」） -->
 <div class="ask" id="askBox" hidden>
   <div class="askcard">
     <div class="askmsg" id="askMsg"></div>
@@ -526,7 +503,7 @@
   </div>
 </div>
 
-<!-- 招呼语提示词编辑弹窗（2026-10-13 已定）：屏幕中间的大输入框，复用 .ask 遮罩样式。
+<!-- 招呼语提示词编辑弹窗：屏幕中间的大输入框，复用 .ask 遮罩样式。
      「完成」保留改动（跟设置页一起保存）；「取消 / ESC / 点遮罩」还原成打开时的内容。
      注意 id 是 promptModal —— promptBox 是设置页里那个按钮容器 -->
 <div class="ask" id="promptModal" hidden>

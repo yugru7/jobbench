@@ -9,7 +9,7 @@ module.exports = (deps) => async (req, res) => {
   try { if (fs.existsSync(paths.SENT_FILE)) text = fs.readFileSync(paths.SENT_FILE, 'utf8'); } catch (_) {}
   const lines = text.split('\n').filter(Boolean).reverse().slice(0, 120);
   const today = localDate();
-  // 统计口径（2026-10-13 已定：每项分「总量 / 今日」）：
+  // 统计口径（每项分「总量 / 今日」）：
   //   发送 / 放入输入框：记录文件按「| 状态」子串计数（历史黏行也能算准）
   //     —— 今日再按行首日期过滤（今天写入的记录必然是规整的）
   //   爬取：读 stats.json（greet.js 每次入池新增时累加；总量为历史近似）

@@ -47,7 +47,7 @@ module.exports = (deps) => async (req, res, body) => {
     return json(res, 200, { ok: true });
   }
 
-  // ---- 清理已发送（2026-10-12 已定：发了的大概率爬不到，从池子里移除）----
+  // ---- 清理已发送（发了的大概率爬不到，从池子里移除）----
   // 只删 sent:true 的岗位（先备份 .bak），未处理的和它的招呼语/勾选保留
   if (p === '/api/collected/clear-sent') {
     backup();
@@ -62,7 +62,7 @@ module.exports = (deps) => async (req, res, body) => {
     return json(res, 200, { ok: true, removed, kept });
   }
 
-  // ---- 删除指定岗位（2026-10-16 加：「获取岗位」页勾选后点删除）----
+  // ---- 删除指定岗位（「获取岗位」页勾选后点删除）----
   // 与 clear-sent 不同：这里不看 sent，勾了哪几个就删哪几个（面板上就是这么用的）
   if (p === '/api/collected/delete') {
     const urls = Array.isArray(body.urls) ? body.urls.filter(u => typeof u === 'string' && u) : null;

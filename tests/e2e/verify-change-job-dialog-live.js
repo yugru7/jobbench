@@ -1,8 +1,8 @@
 /**
- * 回归：真实 BOSS 页面上的弹窗检测器（2026-10-13）
+ * 回归：真实 BOSS 页面上的弹窗检测器
  * 用法：node tests/verify-change-job-dialog-live.js（需登录态 profile，会开浏览器窗口）
  *
- * 真实 BOSS 页面验证：弹窗检测器不误报 + 检测/点击链路在真实页面工作（2026-10-13）
+ * 真实 BOSS 页面验证：弹窗检测器不误报 + 检测/点击链路在真实页面工作
  * 1) 打开真实岗位详情页 → 检查页面本来有没有「沟通新职位」文案（误报风险）
  * 2) 注入复刻截图结构的模拟弹窗 → confirmChangeJobDialog 检测+拟人点击 → 弹窗消失
  * 3) 再检测一次 → false（无残留误判）
@@ -13,7 +13,7 @@ let chromium;
 try { ({ chromium } = require('patchright')); } catch (_) { ({ chromium } = require('playwright-core')); }
 const { CHROME } = require('../../lib/utils');
 const { confirmChangeJobDialog } = require('../../lib/page-helpers');
-const CFG = require('../../config.json');
+const CFG = require('../../data/config.json');
 
 const NO_THROTTLE_ARGS = [
   '--disable-background-timer-throttling',

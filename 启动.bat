@@ -4,7 +4,7 @@ title Job Search Workbench
 cd /d "%~dp0"
 
 rem Find node: PATH first, then common install locations.
-rem (2026-10-14: original had hardcoded node path — broken for clones)
+rem (original had hardcoded node path — broken for clones)
 set "NODE="
 where node >nul 2>&1 && set "NODE=node"
 if not defined NODE if exist "%ProgramFiles%\nodejs\node.exe" set "NODE=%ProgramFiles%\nodejs\node.exe"

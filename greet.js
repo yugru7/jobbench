@@ -19,7 +19,7 @@
  *   node greet.js -k 运维 -n 10       单关键词，最多 10 个
  *   node greet.js --no-cdp           用独立模式（自己起浏览器）
  *
- * 2026-10-14 重构：主流程按功能拆进 lib/（ipc / browser-session / login-guard /
+ * 重构：主流程按功能拆进 lib/（ipc / browser-session / login-guard /
  * collect / send / pool），本文件只留「参数 + 单实例锁 + main() 编排」。零逻辑改动。
  */
 
@@ -42,8 +42,8 @@ const { spawn } = require('child_process');
 // API 完全一致，属于 drop-in replacement，所以下面的代码一个字都不用改。
 // （加载与回退逻辑在上面"引擎名"那一段，已完成）
 
-const DIR = __dirname;
-const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8').replace(/^\uFEFF/, ''));
+const { DIR, DATA_DIR } = require('./lib/data-dir');   // 用户数据统一放 data/（加载时自动迁移老文件）
+const CFG = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'config.json'), 'utf8').replace(/^\uFEFF/, ''));
 // profileDir 允许写相对路径（相对项目目录）—— 开源默认用项目内的 .chrome-profile，
 // 别人 clone 下来不用改路径；写绝对路径也照常生效。
 if (!CFG.profileDir || !path.isAbsolute(CFG.profileDir)) {
@@ -54,7 +54,7 @@ const SENT_FILE = path.join(LOG_DIR, '已打招呼记录.txt');
 const SKIP_FILE = path.join(LOG_DIR, '黑名单.txt');   // 反复失败的岗位，不再尝试
 
 // ---------- 独立子系统（lib/）----------
-// 2026-10-12 重构：自包含子系统迁出 lib/，同名解构 = main 调用点零修改。
+// 重构：自包含子系统迁出 lib/，同名解构 = main 调用点零修改。
 // 依赖注入方式见各文件头部注释。
 const {
   DRY_RUN, USE_CDP, CDP_PORT, FORCE_MAX, KW_INDEX, FORCE_KEYWORD, FORCE_KEYWORDS,
@@ -65,13 +65,13 @@ const { acquireLock, releaseLock } = require('./lib/lock')(CFG.profileDir);
 const { loadSkipList, saveSkipList, markFail } = require('./lib/blacklist')(SKIP_FILE);
 const { sleep, rnd, stamp, withoutProxy, localDate, localDateTime, CHROME,
         cyan, yellow, green, red, gray, white } = require('./lib/utils');
-const { KNOWLEDGE, KNOWLEDGE_FILE, normalizeEntries } = require('./lib/knowledge')(DIR);
+const { KNOWLEDGE, KNOWLEDGE_FILE, normalizeEntries } = require('./lib/knowledge')(DATA_DIR);
 const { buildGreeting, isGuardUrl } = require('./lib/greeting');
-const { searchUrl, readExpectTabs, clickExpectTab, isInternTitle } = require('./lib/search')(CFG, SOURCE);
+const { searchUrl, favUrl, readExpectTabs, clickExpectTab } = require('./lib/search')(CFG, SOURCE);
 const { clickByText, clickGreetButton, clickSendButton, fillGreeting, humanWheelScroll, confirmChangeJobDialog } = require('./lib/page-helpers');
 const { killChromeUsingProfile } = require('./lib/chrome-kill')(CFG.profileDir, LOG_DIR);
 
-// 长尾两段间隔的通用实现（2026-10-13 已定）：
+// 长尾两段间隔的通用实现：
 //   75% 走主段（干脆利落），25% 走尾段（像被别的事拖了一下）。
 // 为什么不用单段均匀：均匀分布每个值等概率，本身就是机器特征；真人的间隔
 // 是长尾的（多数短、偶尔长）。两段平均不变、只是形态自然得多。
@@ -183,7 +183,7 @@ async function waitEnter() {
 }
 
 
-// 节奏参数（设置页可调，2026-10-13 已定）：从 config 读一对 min/max（毫秒/像素）。
+// 节奏参数（设置页可调）：从 config 读一对 min/max（毫秒/像素）。
 // 缺值用默认兜底；用户把 min/max 填反了也能自动排序（天然容错）
 function paceRand(minKey, maxKey, dMin, dMax) {
   let a = Number(CFG[minKey]);
@@ -213,7 +213,7 @@ const { poolKey, loadPoolKeys, mergeIntoPool } = require('./lib/pool')({ LOG_DIR
 const collect = require('./lib/collect')({
   rt, CFG, SOURCE, EXPECT_TAB, FORCE_MAX,
   log, ipcEmit, checkpoint, StoppedError, sec, SECURITY_STOP_AT,
-  buildGreeting, isGuardUrl, searchUrl, readExpectTabs, clickExpectTab,
+  buildGreeting, isGuardUrl, searchUrl, favUrl, readExpectTabs, clickExpectTab,
   humanWheelScroll, gotoWithGuard, passGuard, realUrl, isSecurityPage, isKickedToLogin,
   listReferer, paceRand, nextCollectDelaySec, waitEnter,
   poolKey, loadPoolKeys, mergeIntoPool,
@@ -226,6 +226,9 @@ const send = require('./lib/send')({
   clickGreetButton, clickSendButton, fillGreeting, confirmChangeJobDialog,
   gotoWithGuard, realUrl, loadSkipList, markFail, sec, SECURITY_STOP_AT,
 });
+
+// 「打开 BOSS」模式：只把浏览器带到 BOSS 首页，不跑任何任务（见 lib/open-browser.js）
+const openBrowser = require('./lib/open-browser')({ rt, log });
 
 
 // ============================================================================
@@ -250,8 +253,10 @@ async function main() {
     if (k) keywords = [k];
     else { console.error(`--kw-index ${KW_INDEX} 超出范围，config 里共 ${CFG.keywords.length} 个关键词`); process.exit(1); }
   }
-  // 推荐模式：不需要关键词，循环只跑一轮（kw 只用于 log 显示）
-  if (SOURCE === 'recommend') keywords = ['系统推荐'];  const maxJobs = FORCE_MAX || CFG.maxJobsPerRun;
+  // 推荐 / 收藏模式：不需要关键词，循环只跑一轮（kw 只用于 log 显示）
+  if (SOURCE === 'recommend') keywords = ['系统推荐'];
+  else if (SOURCE === 'fav') keywords = ['我的收藏'];
+  const maxJobs = FORCE_MAX || CFG.maxJobsPerRun;
   const done = todayCount();
 
   console.log('');
@@ -261,7 +266,9 @@ async function main() {
   log(`模式: ${DRY_RUN ? '演练(不打招呼)' : '正式投递'} / ${USE_CDP ? 'CDP连接' : '独立浏览器'}`);
   log(SOURCE === 'recommend'
     ? `来源: 系统推荐流（按你勾选的意向岗位）/ 城市: ${CFG.cityName || ''}`
-    : `关键词: ${keywords.join('、')}`);
+    : SOURCE === 'fav'
+      ? '来源: 我的收藏（你在 BOSS 收藏的岗位，不套城市 / 筛选）'
+      : `关键词: ${keywords.join('、')}`);
   log(`今日已打招呼: ${done} / 上限 ${CFG.dailyCap}`);
   console.log('');
   ipcEmit({
@@ -282,6 +289,12 @@ async function main() {
     rt.closer = async () => { releaseLock(); await innerCloser(); };
   }
   await checkpoint();   // 预热结束后再查一次，避免带着停止指令继续访问 BOSS
+
+  // ---------- 模式：只打开浏览器（供你自己上 BOSS 用，不跑任何任务）----------
+  // 放在「确认登录」之前：这一步纯粹是把浏览器开起来，不替你做登录判定。
+  // 收尾走 rt.closer()（已被包成 releaseLock + 广播「浏览器保持开着」）；
+  // CDP 模式下 Chrome 是 detached 起的，本进程退出它不会跟着关。
+  if (MODE === 'open') { await openBrowser.runOpenMode(); await rt.closer(); return; }
 
   // ---------- 先确认登录，再干活 ----------
   // 没登录就跑 = 白跑一趟还浪费机会。这一步必须挡在最前面。

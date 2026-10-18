@@ -1,5 +1,5 @@
 /**
- * 回归：记录页「统计表(3×4) + 记录表(n×4) 合体」渲染（2026-10-13 已定）
+ * 回归：记录页「统计表(3×4) + 记录表(n×4) 合体」渲染
  * 用法：先启动 server.js，再 node tests/verify-rec-stats.js
  *
  * 断言要点：
@@ -53,7 +53,7 @@ const { CHROME } = require('../../lib/utils');
         const r = document.querySelector('#rows .trow > div:nth-child(3)');
         return r ? getComputedStyle(r).textAlign : '';
       })(),
-      // 吸顶（2026-10-13 已定）：滚到底后，钉在顶部的应是记录表标题(rgtitle)，
+      // 吸顶：滚到底后，钉在顶部的应是记录表标题(rgtitle)，
       // 而不是统计表头(rghead)盖在上面。列数不够时表不可滚，跳过。
       sticky: (() => {
         const tb = document.querySelector('.rectable');
@@ -103,12 +103,12 @@ const { CHROME } = require('../../lib/utils');
   t(out.tableBorder2 !== '0px', '数据表第 2 格有右竖线');
   t(out.tableBorderLast === '0px', '数据表末列无右竖线');
 
-  // 文字统一居中（2026-10-13 已定）
+  // 文字统一居中
   t(out.recCount === 0 || out.recAlign.every((a) => a === 'center'), '记录行四列文字居中');
   t(out.thAlign === 'center', '数据表表头居中');
   t(out.rowAlign === 'center', '数据表数据行居中');
 
-  // 吸顶（2026-10-13 已定）：滚动后顶栏是记录表标题，统计表头不再盖住下面
+  // 吸顶：滚动后顶栏是记录表标题，统计表头不再盖住下面
   if (out.sticky && out.sticky.scrollable) {
     t(out.sticky.inTitle, '滚动后顶栏是记录表标题（rgtitle 盖住统计表头）');
     t(!out.sticky.inHead, '滚动后统计表头不再盖住下方');

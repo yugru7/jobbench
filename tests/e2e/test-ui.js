@@ -36,16 +36,16 @@ const CHROME_PATHS = [
       visEdit: vis('pageEdit'), visSend: vis('pageSend'), visRec: vis('pageRecords'), visKb: vis('pageKb'),
       dirHas: has('pageDir', 'collectSource') && has('pageDir', 'kwChips') && has('pageDir', 'expectChips') && !has('pageDir', 'btnCollect'),
       fetchHas: has('pageFetch', 'btnCollect') && has('pageFetch', 'btnStop') && has('pageFetch', 'fetchRows') && has('pageFetch', 'goDel') && !has('pageFetch', 'goClear') && !has('pageFetch', 'collectSource'),
-      filterHas: has('pageFilter', 'fType') && has('pageFilter', 'tableWrap') && has('pageFilter', 'selInfo') && !has('pageFilter', 'btnCollect'),
+      filterHas: has('pageFilter', 'fActive') && has('pageFilter', 'tableWrap') && has('pageFilter', 'selInfo') && !has('pageFilter', 'btnCollect'),
       greetGoneFromFilter: !document.querySelector('#rows textarea'),
       editHas: has('pageEdit', 'editWrap') && has('pageEdit', 'editRows') && has('pageEdit', 'editEmpty') && !has('pageEdit', 'btnSend') && !has('pageEdit', 'modes'),
-      // 招呼语提示词 2026-10-13 从「编辑招呼语」页迁到「设置」页（已定）
+      // 招呼语提示词从「编辑招呼语」页迁到「设置」页
       promptBox: has('pageSettings', 'promptBox') && !!id('promptText'),
       promptGoneFromEdit: !has('pageEdit', 'promptBox'),
       setHas: has('pageSettings', 'btnResetSettings') && has('pageSettings', 'setMaxJobsPerRun')
         && has('pageSettings', 'setDelayMinSec') && has('pageSettings', 'setClickPauseMinSec')
         && has('pageSettings', 'setDailyCollectCap'),
-      // 2026-10-13 文案改版：内部术语不得出现在用户可见文案里
+      // 文案改版：内部术语不得出现在用户可见文案里
       setPlainCopy: (() => {
         const t = (document.getElementById('pageSettings') || {}).innerText || '';
         return !/长尾|普通间隔|点击前停留|阅读停顿|阅读滚动距离|行为防护|毫秒/.test(t);
@@ -75,7 +75,7 @@ const CHROME_PATHS = [
       cardW: cardW('pageDir') || cardW('pageFetch') || cardW('pageFilter') || cardW('pageEdit') || cardW('pageSend') || cardW('pageRecords'),
       kbCardW: cardW('pageKb'),
       // 可见文案 em-dash 统计：textContent 层面遍历、跳过 .jdcell（JD 摘要是
-      // BOSS 原文，外部数据里的「——」不该算自家文案违规——2026-10-12 实测
+      // BOSS 原文，外部数据里的「——」不该算自家文案违规——实测
       // 基恩公司 JD 自带「——」误报过一次）
       emDash: (() => {
         let n = 0;
@@ -87,7 +87,7 @@ const CHROME_PATHS = [
               // SCRIPT/STYLE（代码注释不算 UI 文案）、TEXTAREA（提示词长文档是
               // 用户可编辑内容，里面的「——」是用户的自由，不算文案违规）、
               // jdcell（JD 摘要是 BOSS 外部数据）、jobname/rjob（岗位名也是 BOSS
-              // 外部数据 —— 2026-10-13 实测「某岗位名(实习生)——某届」误报过）
+              // 外部数据 —— 实测「某岗位名(实习生)——某届」误报过）
               if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEXTAREA'
                 || node.classList.contains('jdcell')
                 || node.classList.contains('jobname')
@@ -167,8 +167,6 @@ const CHROME_PATHS = [
 
   // 筛选条件记忆烟测：改两个筛选 → 刷新 → 值应还在（localStorage 持久化，要求）
   await page.evaluate(() => {
-    const ft = document.getElementById('fType');
-    ft.value = 'intern'; ft.dispatchEvent(new Event('change'));
     const fsal = document.getElementById('fSal');
     fsal.value = '150'; fsal.dispatchEvent(new Event('input'));
   });
@@ -176,14 +174,10 @@ const CHROME_PATHS = [
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2500);
   const memo = await page.evaluate(() => ({
-    type: document.getElementById('fType').value,
     sal: document.getElementById('fSal').value,
-    hasSort: !!document.getElementById('fSort'),
   }));
   // 测完恢复默认并清掉存储，不污染用户界面
   await page.evaluate(() => {
-    const ft = document.getElementById('fType');
-    if (ft) { ft.value = ''; ft.dispatchEvent(new Event('change')); }
     const fsal = document.getElementById('fSal');
     if (fsal) { fsal.value = ''; fsal.dispatchEvent(new Event('input')); }
     try { localStorage.removeItem('boss-filters'); } catch (_) {}
@@ -201,7 +195,7 @@ const CHROME_PATHS = [
 
   const out = [];
   const ok = (name, cond, extra) => out.push(`${cond ? 'PASS' : 'FAIL'}  ${name}${extra ? '  (' + extra + ')' : ''}`);
-  // 2026-10-13：设置页签改成普通文字页签，排在「记录」后面
+  // 设置页签改成普通文字页签，排在「记录」后面
   ok('页签 = 项目介绍/如何使用/个人经历知识库/岗位初筛/获取岗位/二次筛选/编辑招呼语/发送/记录/设置，默认岗位初筛',
     rDir.tabs === '项目介绍,如何使用,个人经历知识库,岗位初筛,获取岗位,二次筛选,编辑招呼语,发送,记录,设置' && rDir.settingsLast
       && rDir.visDir && !rDir.visFetch && !rDir.visKb && !rDir.visEdit && !rDir.visSend && !rDir.visRec, rDir.tabs);
@@ -221,8 +215,7 @@ const CHROME_PATHS = [
   ok('「自定义城市」已移除', rDir.cityCustomGone);
   ok('投递方向最多一个（搜索一次只爬一个）', rDir.kwCount <= 1, `${rDir.kwCount} 个`);
   ok('城市切换（选杭州）生效，CITY 可更新', citySwap === '杭州', String(citySwap));
-  ok('筛选条件记忆：刷新后保留（localStorage）', memo.type === 'intern' && memo.sal === '150', `type=${memo.type} sal=${memo.sal}`);
-  ok('排序下拉存在（默认/活跃度/薪资）', memo.hasSort);
+  ok('筛选条件记忆：刷新后保留（localStorage）', memo.sal === '150', `sal=${memo.sal}`);
   ok('知识库页含 我是谁/经历/技能 字段', rKb.kbHas);
   ok('运行日志：容器在但已隐藏', rDir.logHidden);
   ok('一屏 1440（六个工作台页都不出页面滚动）',

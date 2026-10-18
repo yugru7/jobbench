@@ -1,5 +1,5 @@
 /**
- * 回归：设置页（2026-10-13 已定：限额/间隔/防护参数开放给用户 + 提示词迁移）
+ * 回归：设置页（限额/间隔/防护参数开放给用户 + 提示词迁移）
  * 用法：先启动 server.js，再 node tests/verify-settings.js
  *
  * 覆盖：
@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const DIR = path.join(__dirname, '..', '..');
-const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
 let chromium;
 try { ({ chromium } = require('patchright')); } catch (_) { ({ chromium } = require('playwright-core')); }
 const { CHROME, sleep } = require('../../lib/utils');
@@ -38,7 +38,7 @@ const FIELDS = ['maxJobsPerRun', 'dailyCollectCap', 'dailyCap',
   'collectDelayTailMinSec', 'collectDelayTailMaxSec',
   'clickPauseMinMs', 'clickPauseMaxMs', 'readPauseMinMs', 'readPauseMaxMs',
   'readScrollMinPx', 'readScrollMaxPx'];
-// 界面 id 用的键：毫秒字段在界面上是「秒」，所以 id 叫 ...Sec（2026-10-13 文案改版）
+// 界面 id 用的键：毫秒字段在界面上是「秒」，所以 id 叫 ...Sec（文案改版）
 const UIKEY = { clickPauseMinMs: 'clickPauseMinSec', clickPauseMaxMs: 'clickPauseMaxSec',
   readPauseMinMs: 'readPauseMinSec', readPauseMaxMs: 'readPauseMaxSec' };
 // 界面显示值（config→界面）：毫秒→秒、0~1→0~100
@@ -65,12 +65,12 @@ const ok = (c, name, extra = '') => { if (c) { pass++; console.log('  ✅ ' + na
     args: ['--start-maximized', '--disable-blink-features=AutomationControlled'],
   });
   const page = await browser.newPage();
-  // 手动保存语义（2026-10-13）：改完必须点「保存设置」才落盘
+  // 手动保存语义：改完必须点「保存设置」才落盘
   const clickSaveBar = () => page.evaluate(() => { const b = document.getElementById('btnSaveSettings'); if (b) b.click(); });
   await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
   await sleep(2500);
 
-  // 设置页签：普通文字页签，排在「记录」后面（2026-10-13 弃用齿轮）
+  // 设置页签：普通文字页签，排在「记录」后面（弃用齿轮）
   const settingsTab = await page.evaluate(() => {
     const tabs = [...document.querySelectorAll('.tabs .tab')];
     const g = tabs.find((t) => t.getAttribute('data-tab') === 'settings');
@@ -139,7 +139,7 @@ const ok = (c, name, extra = '') => { if (c) { pass++; console.log('  ✅ ' + na
   await clickSaveBar();
   await sleep(1600);   // 等落盘 + 回填
 
-  const disk = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+  const disk = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
   ok(disk.maxJobsPerRun === 7, 'maxJobsPerRun 已落盘 = 7', '实际 ' + disk.maxJobsPerRun);
   ok(disk.delayMinSec === 5, 'delayMinSec 已落盘 = 5', '实际 ' + disk.delayMinSec);
   ok(disk.clickPauseMinMs === 300, '界面填 0.3 秒 → config 落盘 300ms', '实际 ' + disk.clickPauseMinMs);
@@ -165,13 +165,13 @@ const ok = (c, name, extra = '') => { if (c) { pass++; console.log('  ✅ ' + na
   ok(after.mj === '7' && after.dm === '5' && after.cp === '0.3', '刷新后仍是新值（界面单位）', JSON.stringify(after));
 
   console.log('\n===== ③ 前端预校验：越界拦下不落盘 / 合法值正常保存 =====');
-  // 2026-10-13 已定：越界值前端当场拦（toast + 不提交），不再走「服务端钳制后回填」。
+  // 越界值前端当场拦（toast + 不提交），不再走「服务端钳制后回填」。
   // 只要有一个字段越界，整个保存就被拦下，所以下面每步都先把越界项收回合法值。
   const setField = (id, v) => page.evaluate(([i, val]) => {
     const e = document.getElementById(i); e.value = val; e.dispatchEvent(new Event('input'));
   }, [id, v]);
   const fieldVal = (id) => page.evaluate((i) => document.getElementById(i).value, id);
-  const cfgNow = () => JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+  const cfgNow = () => JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
   const cfg0 = cfgNow();
 
   await setField('setDailyCollectCap', '9999');
@@ -206,7 +206,7 @@ const ok = (c, name, extra = '') => { if (c) { pass++; console.log('  ✅ ' + na
   page.once('dialog', (d) => d.accept());
   await page.evaluate(() => { document.getElementById('btnResetSettings').click(); });
   await sleep(1800);
-  const resetDisk = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+  const resetDisk = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
   const expected = { maxJobsPerRun: 10, dailyCollectCap: 80, dailyCap: 60, delayMinSec: 4, delayMaxSec: 6,
     delayTailRatio: 0.25, delayTailMinSec: 6, delayTailMaxSec: 12, clickPauseMinMs: 0, clickPauseMaxMs: 2000,
     readPauseMinMs: 1000, readPauseMaxMs: 2000, readScrollMinPx: 300, readScrollMaxPx: 700 };
@@ -250,7 +250,7 @@ const ok = (c, name, extra = '') => { if (c) { pass++; console.log('  ✅ ' + na
   for (const k of Object.keys(before)) if (/^(maxJobsPerRun|dailyCollectCap|dailyCap|delay|collectDelay|clickPause|readPause|readScroll)/.test(k)) {
     await post('/api/config', { [k]: before[k] });
   }
-  const restored = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+  const restored = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
   const notRestored = Object.keys(before).filter((k) => /^(maxJobsPerRun|dailyCollectCap|dailyCap|delay|collectDelay|clickPause|readPause|readScroll)/.test(k) && restored[k] !== before[k]);
   console.log('参数还原: ' + (notRestored.length ? '⚠️ ' + notRestored.join(',') : '✅ 与测试前一致'));
 

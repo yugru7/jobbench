@@ -54,7 +54,7 @@ const routes = buildRoutes(deps);
 const server = http.createServer(async (req, res) => {
   const p = new URL(req.url, `http://127.0.0.1:${PORT}`).pathname;
 
-  // 本机来源白名单（2026-10-14 安全加固）：Host / Origin 不合法直接 403
+  // 本机来源白名单：Host / Origin 不合法直接 403
   if (!httpUtil.checkOrigin(req, res)) return;
 
   try {

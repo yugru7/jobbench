@@ -24,13 +24,14 @@
     --ease: cubic-bezier(.22, 1, .36, 1);
     --hd: 70px;   /* header 占位（高度+下边距），boot() 会实测覆盖 */
     --hdr: 45px;  /* 纯 header 高度（sticky 页签定位用），boot() 会实测覆盖 */
+    --pgap: 12px; /* 页内留白：白盒与上方页签、与窗口底部的间距（两处必须同源，才对称） */
   }
   html, body { margin: 0; padding: 0; }
   body {
     background: var(--paper); color: var(--ink);
     font: 13.5px/1.65 -apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
     font-variant-numeric: tabular-nums;
-    padding-bottom: 22px;
+    padding-bottom: var(--pgap);   /* 白盒距窗口底部 = 页签距白盒（--pgap），上下对称 */
   }
   .wrap { max-width: 1360px; margin: 0 auto; padding: 0 20px; }
   ::selection { background: var(--accent-wash); }
@@ -48,7 +49,7 @@
   .badge.run { background: var(--accent-wash); border-color: transparent; color: var(--accent); }
   .badge.pause { background: var(--warn-wash); border-color: transparent; color: var(--warn); }
   .badge.err { background: var(--err-wash); border-color: transparent; color: var(--err); }
-  /* header 里的启动异常提示（2026-10-13 已定）：标题后红字胶囊，
+  /* header 里的启动异常提示：标题后红字胶囊，
      出错不整页崩；长了省略号，悬停看全文（title） */
   .hdr-err { font-size: 12px; padding: 2px 10px; border-radius: 999px;
     background: var(--err-wash); color: var(--err); border: 1px solid #e8c8c4;
@@ -56,7 +57,7 @@
   .spacer { flex: 1; }
   /* 页 0：项目介绍 */
   .abwrap { padding: 0 6px 10px; }
-  /* 项目介绍 / 如何使用：页签已有标题，页内重复的大标题删掉，正文直接开始（2026-10-13 已定） */
+  /* 项目介绍 / 如何使用：页签已有标题，页内重复的大标题删掉，正文直接开始 */
   #pageAbout .abwrap > .absec:first-child,
   #pageHow .abwrap > .absec:first-child { margin-top: 4px; }
   .absec { font-size: 14.5px; font-weight: 600; color: var(--ink); margin: 20px 0 8px; padding-left: 10px; border-left: 3px solid var(--accent); }
@@ -66,7 +67,7 @@
   .abwarn { border: 1px solid var(--warn); background: var(--warn-wash); border-radius: 8px; padding: 12px 16px 4px; margin-top: 4px; }
   .abwarn .abp { color: var(--ink); }
 
-  /* 记录页：统计表(3×4) + 记录表(n×4) 合体，共用同一列宽 → 竖线贯通（2026-10-13 已定） */
+  /* 记录页：统计表(3×4) + 记录表(n×4) 合体，共用同一列宽 → 竖线贯通 */
   .rectable { --rcols: 122px minmax(160px,1.8fr) minmax(110px,1.1fr) 140px; padding: 0; }
   .rghead, .rgrow, .rgtitle, .recline { display: grid; grid-template-columns: var(--rcols); align-items: center; }
   .rghead > span, .rgrow > span, .rgtitle > span, .recline > span {
@@ -74,7 +75,7 @@
   .rghead > span:last-child, .rgrow > span:last-child, .rgtitle > span:last-child, .recline > span:last-child { border-right: none; }
   .rghead, .rgtitle { background: #f8f6f1; border-bottom: 1px solid var(--line);
     font-size: 12px; color: var(--ink-2); font-weight: 500; }
-  /* 记录页吸顶（2026-10-13 已定）：统计表头先钉住；记录表标题到顶后盖在它上面
+  /* 记录页吸顶：统计表头先钉住；记录表标题到顶后盖在它上面
      （z-index 更高）→ 顶栏内容「改名」为 时间/岗位/公司/状态，不再反过来盖住下面 */
   .rghead { position: sticky; top: 0; z-index: 3; }
   .rgtitle { position: sticky; top: 0; z-index: 4; }
@@ -93,49 +94,52 @@
   .rectable .rnone { padding: 28px 10px; text-align: center; color: var(--ink-3); }
 
   /* ---------- 页签 + 分页（知识库 + 工作台四步） ---------- */
-  /* 工作台页（.wp）激活时 #mainWrap 定高（--hd = header 占位，boot() 实测）→
-     页面恒定一屏，表格/列表内部滚动；知识库页不锁高、正常滚动 */
+  /* 任一页面激活时 #mainWrap 定高（--hd = header 占位，boot() 实测）→ 页面恒占一屏。
+     所有页面统一走这一条 —— 「白盒有默认高度」= 卡片默认撑到接近窗口底部，
+     内容少的页面不再是「半截白盒」；内容超出则靠卡片默认 min-height:auto（=内容高）自然顶长，
+     整页照常滚动（不会被压扁、不会截断） */
   #mainWrap { display: flex; flex-direction: column; }
-  body:has(.wp.on) #mainWrap { height: calc(100vh - var(--hd) - 22px); }
-  /* 顶栏 10 个页签均分整行、文字略大（2026-10-13 已定：右端不留空、字稍大）。
+  body:has(.page.on) #mainWrap { height: calc(100vh - var(--hd) - var(--pgap)); }
+  /* 顶栏 10 个页签均分整行、文字略大（右端不留空、字稍大）。
      flex:1 1 0 = 等分；默认 min-width:auto 保证窄窗口下长标签（个人经历知识库）不被压扁失字 */
-  .tabs { display: flex; gap: 2px; margin: 0 -20px 12px; border-bottom: 1px solid var(--line);
+  .tabs { display: flex; gap: 2px; margin: 0 -20px var(--pgap); border-bottom: 1px solid var(--line);
     position: sticky; top: var(--hdr); z-index: 55; background: var(--paper); padding: 8px 20px 0; }
-  /* 未选中页签字色（2026-10-14 反馈「偏淡」）：--ink-3 → --ink-2，加深一档 */
+  /* 未选中页签字色（反馈「偏淡」）：--ink-3 → --ink-2，加深一档 */
   .tab { flex: 1 1 0; text-align: center; background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0;
     padding: 6px 8px; margin-bottom: -1px; color: var(--ink-2); font-size: 15px; white-space: nowrap; }
   .tabs .tab:hover:not(:disabled) { background: none; border-color: transparent;
     border-bottom-color: var(--line-strong); color: var(--ink); }
   .tabs .tab.on, .tabs .tab.on:hover:not(:disabled) { color: var(--ink);
     border-bottom-color: var(--accent); background: none; font-weight: 600; }
-  /* 设置入口：普通文字页签，排在「记录」后面（2026-10-13 已定，弃用齿轮） */
+  /* 设置入口：普通文字页签，排在「记录」后面（弃用齿轮） */
   /* 设置页：紧凑表单行 */
   .setwrap { margin-top: 2px; }
   .setwrap .absec { margin: 16px 0 6px; }
   /* gap 收到 2px：输入框紧贴标签，不要留空档（反馈"输入框离字有点远"） */
   .setrow { display: flex; align-items: center; gap: 2px; padding: 6px 4px; font-size: 13px; color: var(--ink-2); flex-wrap: wrap; }
-  /* 标签不定宽（2026-10-13 已定）：原来 min-width 会让短标签后面空出一块，
+  /* 标签不定宽：原来 min-width 会让短标签后面空出一块，
      要求「输入框把两边文字连起来，不要留长空」—— 宽度随内容走 */
   .setrow .setk { flex: 0 0 auto; }
   .setrow input[type="number"] { width: 68px; margin-left: 6px; padding: 4px 6px; }
   .setrow input[type="number"] + input[type="number"] { margin-left: 0; }  /* 区间第二个框贴第一个 */
   .setrow input[type="number"] ~ .setu { margin-left: 6px; }              /* 说明文字与输入框的间距 */
-  /* 两侧文字样式统一（2026-10-13 已定）：标签与说明同色同字号，读起来是一句话 */
+  /* 两侧文字样式统一：标签与说明同色同字号，读起来是一句话 */
   .setrow .setu { color: var(--ink-2); font-size: 13px; }
-  /* 提示词入口：就一个按钮（2026-10-13 已定） */
+  /* 提示词入口：就一个按钮 */
   .setprompt { margin-top: 2px; }
   /* 提示词编辑弹窗：屏幕中间的大输入框（复用 .ask 遮罩 + .askcard 卡片） */
   .askcard.wide { max-width: 900px; }
   .askcard.wide textarea { height: min(58vh, 520px); line-height: 1.7; }
   .askcard.wide .askbtns { align-items: center; }
   /* 设置页底部操作行：保存 / 撤销 / 恢复默认 + 状态提示
-   （2026-10-13 已定：不做底部悬浮栏，按钮就放在「恢复默认设置」那一行） */
+   （不做底部悬浮栏，按钮就放在「恢复默认设置」那一行） */
   .setfoot { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line-soft); align-items: center; gap: 8px; }
   .setfoot .setdirty { color: var(--ink-3); font-size: 13px; margin-left: 4px; }
   .setfoot .setdirty.isdirty { color: var(--warn); font-weight: 500; }
   .page { display: none; }
-  .page.on { display: flex; flex-direction: column; gap: 12px; }
-  .wp.on { flex: 1 1 auto; min-height: 0; }
+  /* 激活的页面撑满 #mainWrap；页内那张卡片再撑满页面（.page.on > .card）→
+     所有页面的白盒同高（默认占一屏）。内容比一屏高时容器被内容顶长，页面照常滚动 */
+  .page.on { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; }
 
   .card { background: var(--card); border: 1px solid var(--line);
     border-radius: var(--r-card); padding: 14px 16px; margin: 0; }
@@ -145,7 +149,12 @@
     width: 19px; height: 19px; border-radius: 5px; background: var(--accent-wash);
     color: var(--accent); font-family: var(--mono); font-size: 11.5px; font-weight: 600; flex: 0 0 auto; }
   .hint { font-weight: 400; color: var(--ink-3); font-size: 12px; }
-  .card.grow { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  /* 页内卡片统一撑满可用高度：短内容页不再只画半截白盒。
+     只写 flex、不压 min-height —— 默认 min-height:auto（=内容高），内容比一屏高时
+     卡片跟着长，不会被压扁截断 */
+  .page.on > .card { flex: 1 1 auto; }
+  /* .grow 额外放开 min-height，让卡片里的表格自己内部滚动（工作台页一屏布局） */
+  .card.grow { min-height: 0; display: flex; flex-direction: column; }
 
   .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   label.fld { font-size: 12.5px; color: var(--ink-2); flex: 0 0 auto; }
@@ -196,7 +205,7 @@
   .seg button.on, .seg button.on:hover:not(:disabled) { background: var(--accent-wash);
     color: var(--accent-deep); font-weight: 500; }
 
-  /* ---------- 发送页：页面宽，方式/按钮做大一档（已定） ---------- */
+  /* ---------- 发送页：页面宽，方式/按钮做大一档 ---------- */
   .sendcard .seg button { padding: 12px 26px; font-size: 14.5px; }
   .sendcard #btnSend { padding: 12px 30px; font-size: 15px; }
   .sendrow { align-items: center; gap: 12px; margin: 4px 0 10px; }
@@ -213,9 +222,8 @@
   .thead > div, .trow > div { padding: 8px 11px; min-width: 0; text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .trow { border-bottom: 1px solid var(--line-soft); font-size: 13px; }
-  .trow:last-child { border-bottom: none; }
   .trow:hover { background: #faf9f5; }
-  /* 数据表竖线：列之间加分隔线（2026-10-13 已定，获取/二筛/编辑招呼语三张表共用） */
+  /* 数据表竖线：列之间加分隔线（获取/二筛/编辑招呼语三张表共用） */
   .thead > div:not(:last-child), .trow > div:not(:last-child) { border-right: 1px solid var(--line); }
   .trow.sent { opacity: .45; }
   .trow input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); }
@@ -236,7 +244,7 @@
   /* ---------- 编辑招呼语页：勾选岗位表格化（岗位/公司/JD摘要/招呼语） ---------- */
   #editWrap { flex: 1; min-height: 0; margin-top: 10px; }
   .etrow { align-items: stretch; }
-  /* 列间竖线要连满整行（2026-10-14 反馈「竖线没连完整」）：
+  /* 列间竖线要连满整行（反馈「竖线没连完整」）：
      本行高度由「招呼语」列的 textarea 决定，其余单元格若 align-self:center
      就只占文字那一行高，border-right 在行与行之间断开。
      改成 stretch 撑满行高后，用 align-content:center 把文字在块内垂直居中
@@ -331,11 +339,4 @@
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
-  }
-
-  /* 窄屏回退：放开定高（页面可正常滚动），表格限高 */
-  @media (max-width: 1180px) {
-    body:has(.wp.on) #mainWrap { height: auto; }
-    .wp.on { flex: none; }
-    .card.grow .table { max-height: 62vh; }
   }

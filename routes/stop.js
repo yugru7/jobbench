@@ -13,7 +13,7 @@ module.exports = (deps) => async (req, res) => {
     const t0 = Date.now();
     const timer = setInterval(() => {
       if (!target || target.exitCode !== null || target.killed) { clearInterval(timer); return; }
-      // 12 秒 → 5 秒（2026-10-13）：预热阶段已有 checkpoint 会立刻响应，
+      // 12 秒 → 5 秒：预热阶段已有 checkpoint 会立刻响应，
       // 这里的兜底强杀只留给"卡死"的极端情况，等太久用户以为没停掉
       if (Date.now() - t0 > 5000) { try { target.kill(); } catch (_) {} clearInterval(timer); }
     }, 1000);

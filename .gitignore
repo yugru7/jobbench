@@ -6,6 +6,7 @@ _*.txt
 
 # 私人数据（不进仓库）：知识库 / 截图
 knowledge.json
+data/knowledge.json
 .screenshots/
 
 # 浏览器登录配置目录（运行时生成，含登录态，不进仓库）

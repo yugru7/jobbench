@@ -11,14 +11,17 @@ async function boot() {
   document.documentElement.style.setProperty('--hdr', Math.ceil(hd.getBoundingClientRect().height) + 'px');
   // 唯一「致命」的一步：bootstrap 拿不到 = 服务没起来（或面板被双击打开），
   // 这时界面确实没数据可用 → 打标记，交给上层显示整页引导卡片。
-  // 其余初始化步骤出错都只在标题后红字提示，不整页崩（2026-10-13 已定）。
+  // 其余初始化步骤出错都只在标题后红字提示，不整页崩。
   try {
     BOOT = await api('/api/bootstrap');
   } catch (e) {
     e.__bootFailed = true;
     throw e;
   }
-  const cfg = BOOT.config || {};   // 防御：字段异常不让整页崩（2026-10-13）
+  const cfg = BOOT.config || {};   // 防御：字段异常不让整页崩
+  // 岗位初筛筛选 chips 的数据源与已选值（filters 缺失时 FILTERS_DATA=null，前端降级）
+  FILTERS_DATA = BOOT.filters || null;
+  SOURCE_FILTERS = JSON.parse(JSON.stringify(cfg.sourceFilters || {}));
 
   SELECTED = new Set(cfg.keywords || []);
   // 搜索模式一次只爬一个方向：老配置里存了多个的，只留第一个（写回配置）
@@ -65,7 +68,7 @@ async function boot() {
     o.textContent = cfg.cityName || '未在列表'; sel.appendChild(o);
   }
   if (cfg.cityCode) sel.value = String(cfg.cityCode);
-  // 城市持久化（2026-10-12 修）：以前只存内存，刷新/重启就丢回 config 旧值 ——
+  // 城市持久化：以前只存内存，刷新/重启就丢回 config 旧值 ——
   // 用户选了北京却爬出上海岗（config 里还是旧城市）。选择即落 config，
   // collect 的 --city-code、boot 恢复、命令行默认全用同一份
   const saveCity = () => {
@@ -78,38 +81,53 @@ async function boot() {
     const c0 = curProv.cities[0];
     if (c0) { sel.value = String(c0.code); CITY = { name: c0.name, code: String(c0.code) }; }
     saveCity();
+    renderFilterNav();   // 换省 → 区县变了，「工作区域」选项要跟着刷新
   };
   sel.onchange = () => {
     const c = (curProv.cities || []).find(x => String(x.code) === String(sel.value));
     if (c) CITY = { name: c.name, code: String(c.code) };
     saveCity();
+    renderFilterNav();   // 换市 → 区县变了
   };
 
-  // 经验档位（2026-10-16 新面板）：回填 config + 持久化
-  const expSel = $('experienceSel');
-  if (expSel) {
-    const curExp = String(cfg.experience || '');
-    if ([...expSel.options].some(o => o.value === curExp)) expSel.value = curExp;
+  // 经验档位（初筛页里的多选 chips，见 FILTER_GROUPS）：把 config 回填进 EXP_CODES
+  EXP_CODES = String(cfg.experience || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  // 「多来源共有」的筛选项（求职类型/学历/规模/融资）全局一份：
+  // 以「面板进入时选中的来源」的现有值为准，统一写进 search/recommend/expect —— 这样切来源时它不变。
+  // 只在真有来源之间不一致时才写回配置（避免无谓改动）。
+  {
+    const remembered = uiPrefs().source;
+    const baseSrc = FILTER_SOURCES.includes(remembered) ? remembered : 'search';
+    let changed = false;
+    for (const g of FILTER_GROUPS) {
+      if (!isSharedGroup(g)) continue;
+      const v = (SOURCE_FILTERS[baseSrc] || {})[g.key] || '';
+      for (const s of FILTER_SOURCES) {
+        SOURCE_FILTERS[s] = SOURCE_FILTERS[s] || {};
+        if ((SOURCE_FILTERS[s][g.key] || '') !== v) { SOURCE_FILTERS[s][g.key] = v; changed = true; }
+      }
+    }
+    if (changed) saveSourceFilters();   // actions.js 里的写回函数（同一全局作用域）
   }
-  window.saveExperience = (v) => {
-    fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ experience: String(v || '') }) }).catch(() => {});
-  };
 
   restoreFilters();   // 筛选条件记忆：恢复上次的选择（要在首次 renderRows 之前）
 
-  // 界面习惯记忆（2026-10-13 已定：刷新 / 重启后保持当前状态）——
+  // 界面习惯记忆（刷新 / 重启后保持当前状态）——
   // 恢复来源 / 发送方式 / 意向方向。意向方向直接用记住的方向列表渲染，
   // 不在这里真读 BOSS（否则页面一开就弹浏览器，太打扰）。
   const ui = uiPrefs();
   if (['fillOnly', 'confirm', 'auto'].includes(ui.sendMode)) pickMode(ui.sendMode);
-  if (['search', 'recommend', 'expect'].includes(ui.source)) {
+  if (['search', 'recommend', 'expect', 'fav'].includes(ui.source)) {
     $('collectSource').value = ui.source;
     EXPECT_TABS = Array.isArray(ui.expectTabs) ? ui.expectTabs : [];
     EXPECT_PICKED = ui.expectTab || '';
     applySource(ui.source, false);
     if (ui.source === 'expect') renderExpectChips(EXPECT_TABS);
   }
+  // 来源 chip 导航栏 + 筛选 chips（没记住来源时也照默认 search 渲染出来）
+  renderSourceNav();
+  renderFilterNav();
 
   renderKnowledge(BOOT.knowledge || {});
 
@@ -123,7 +141,7 @@ async function boot() {
   applyState(BOOT.state || {});
 }
 
-// 启动过程中的非致命异常提示（2026-10-13 已定）：
+// 启动过程中的非致命异常提示：
 // 在标题后显示红字胶囊，而不是把整页替换成「连不上本地服务」错误卡片 ——
 // 服务明明是通的、数据也在，只是某一步初始化出错，页面主体应该照常可用。
 // 文案长了胶囊里省略号，悬停（title）看全文；同时打 console 便于排查。
@@ -184,14 +202,6 @@ function actClass(a) {
   return ['cold', a];
 }
 // ---- 二次筛选：从候选里挑出真正想投的 ----
-function activeRank(a) {
-  if (!a) return 9;
-  if (/刚刚活跃/.test(a)) return 0;
-  if (/今日活跃/.test(a)) return 1;
-  if (/3日内活跃|三日/.test(a)) return 2;
-  if (/本周活跃/.test(a)) return 3;
-  return 4;
-}
 // 薪资文本 → 折算日薪（元/天）。支持 150-200元/天、5-8K、8千-1.2万 这类格式；
 // 解析不出来返回 0（筛选时不受影响）
 function salaryDaily(s) {
@@ -211,39 +221,27 @@ function salaryDaily(s) {
 
 function visibleCands() {
   const act = $('fActive').value;
-  const type = $('fType') ? $('fType').value : '';
   const salMin = parseFloat(($('fSal') && $('fSal').value) || '') || 0;
-  const sizeText = $('fSize') ? $('fSize').value.trim() : '';
   const ind = $('fInd') ? $('fInd').value.trim() : '';
   const week = $('fWeek') ? $('fWeek').value : '';
-  const sort = $('fSort') ? $('fSort').value : '';
 
-  // 实习判定：标题或 JD 里出现实习字样都算（实测：标题没写但 JD 里写的岗位
-  // 不该被「仅实习/校招」滤掉；收集端不做实习过滤，全职/实习全收进来在这里分）
-  const isIntern = j => /实习|见习|应届|在校|校招/.test(`${j.job || ''} ${j.jd || ''}`);
-
+  // 注：不再按「实习/全职」分 —— 关键词判定会把
+  // 「实习生勿投 / 不招实习生」这类否定句也算成实习，不可靠，交给人自己看。
   let list = CANDS.map((j, i) => ({ j, i }));
   // 已发送的直接不进二筛/编辑视图（已定：大概率爬不到了，留着纯噪音）
   list = list.filter(x => !x.j.sent);
-  if (type === 'intern') list = list.filter(x => isIntern(x.j));
-  else if (type === 'full') list = list.filter(x => !isIntern(x.j));
   if (act === 'hot') list = list.filter(x => /刚刚活跃|今日活跃/.test(x.j.active || ''));
   else if (act === 'mid') list = list.filter(x => /刚刚活跃|今日活跃|3日内活跃|本周活跃/.test(x.j.active || ''));
 
   // 日薪下限：工资文本解析出来的才比，没解析出来的不受影响
   if (salMin > 0) list = list.filter(x => { const d = salaryDaily(x.j.salary); return d === 0 || d >= salMin; });
-  // 公司规模：直接按 BOSS 原生档位精确匹配（0-20人 / 20-99人 / ... / 10000人以上）。
-  // 不做下限换算（已定：把下限换成爬到的格式）；未知规模在具体档位下自然不匹配
-  if (sizeText) list = list.filter(x => (x.j.companySize || '').trim() === sizeText);
   if (ind) list = list.filter(x => (x.j.industry || '').includes(ind));
-  // 双休（2026-10-14 已定：按「每周至少休 2 天」分）：
+  // 双休（按「每周至少休 2 天」分）：
   //   1~5 天/周 → 有双休（每周休 ≥2 天）；6~7 天/周 → 无双休（单休及以下）
   //   没爬到该信息（0）的岗位只在「不限」下出现
   if (week === 'yes') list = list.filter(x => x.j.daysPerWeek > 0 && x.j.daysPerWeek <= 5);
   else if (week === 'no') list = list.filter(x => x.j.daysPerWeek >= 6);
 
-  if (sort === 'active') list.sort((a, b) => activeRank(a.j.active) - activeRank(b.j.active));
-  else if (sort === 'salary') list.sort((a, b) => salaryDaily(b.j.salary) - salaryDaily(a.j.salary));   // 解析不出的（0）排后面
   return list;
 }
 
@@ -251,7 +249,7 @@ function visibleCands() {
 // renderRows() 是所有筛选控件 onchange/oninput 的统一入口，在这里顺手保存最省事；
 // boot() 里恢复。控件是静态 HTML，恢复后首个 renderRows 即按恢复值过滤。
 const FILTER_KEY = 'boss-filters';
-const FILTER_IDS = ['fType', 'fActive', 'fWeek', 'fSal', 'fSize', 'fInd', 'fSort'];
+const FILTER_IDS = ['fActive', 'fWeek', 'fSal', 'fInd'];
 function saveFilters() {
   try {
     const v = {};
@@ -278,7 +276,7 @@ const COLS = [
   { key: 'active',   label: '活跃度', w: '100px',                kind: 'active' },
   { key: 'jd',       label: 'JD 摘要', w: 'minmax(150px,1.4fr)', kind: 'jd' },
 ];
-// 获取岗位页的全量表：和二次筛选页同一份列定义（含勾选框）—— 2026-10-16 起这页
+// 获取岗位页的全量表：和二次筛选页同一份列定义（含勾选框）—— 这页
 // 也能勾选（单选 / 多选 / 表头全选），勾完可批量删除不要的岗位（勾选状态与二筛各自独立）
 const FETCH_COLS = COLS;
 
@@ -302,7 +300,7 @@ function renderRows() {
   const list = visibleCands();
   $('tableWrap').style.display = CANDS.length ? '' : 'none';
   $('tableEmpty').style.display = CANDS.length ? 'none' : '';
-  $('mCand').textContent = CHECKED.size;   // 发送页指标 = 二筛勾选的数量（已定）
+  $('mCand').textContent = CHECKED.size;   // 发送页指标 = 二筛勾选的数量
 
   const fi = $('filterInfo');
   if (fi) fi.textContent = CANDS.length ? `筛出 ${list.length} / ${CANDS.length} 个` : '';
@@ -341,10 +339,12 @@ function cellHTML(c, j) {
   }
   const v = j[c.key] || '-';
   const tip = c.tip ? ` title="${attr(v)}"` : '';
-  return `<div class="${c.cls || ''}"${tip}>${esc(v)}</div>`;
+  // 收藏来源的岗位在岗位名前加「★」（获取岗位页 / 二次筛选页两张表都走这里）
+  const star = (c.key === 'job' && j.src === 'fav') ? '★ ' : '';
+  return `<div class="${c.cls || ''}"${tip}>${star}${esc(v)}</div>`;
 }
 
-// 获取岗位页：池子表（2026-10-12 已定：已发送的也不再显示——发了的大概率爬不到了）
+// 获取岗位页：池子表（已发送的也不再显示——发了的大概率爬不到了）
 function renderFetchRows() {
   if (!$('fetchHead').childElementCount) {
     renderHeadInto($('fetchHead'), $('fetchWrap'), FETCH_COLS,
@@ -405,7 +405,7 @@ function renderEditRows() {
     const d = document.createElement('div');
     d.className = 'trow etrow';
     d.innerHTML = `
-      <div class="ell jobname" title="${attr(j.job)}">${esc(j.job)}</div>
+      <div class="ell jobname" title="${attr(j.job)}">${j.src === 'fav' ? '★ ' : ''}${esc(j.job)}</div>
       <div class="ell" title="${attr(j.company)}">${esc(j.company || '-')}</div>
       <div class="jdcell" title="${attr(j.jd || '')}">${j.jd ? esc(String(j.jd).replace(/\s+/g, ' ').slice(0, 100)) : '-'}</div>
       <div class="gcell"><textarea rows="2" placeholder="招呼语（会原样发给 HR，改完即存）"
@@ -421,7 +421,7 @@ function toggleAll(on) {
   saveChecked();
   renderRows(); renderEditRows();
 }
-// 「获取岗位」页的勾选（2026-10-16 加）：独立于二筛的 CHECKED ——
+// 「获取岗位」页的勾选：独立于二筛的 CHECKED ——
 // 这里勾 = 选中要删除的岗位，不该写进 checkedUrls（agent 会把 checked 当成「要写招呼语的岗位」）
 function fetchToggleOne(url, on) {
   on ? FETCH_SEL.add(url) : FETCH_SEL.delete(url);
@@ -434,14 +434,14 @@ function fetchToggleAll(on) {
 }
 // 勾选持久化（localStorage）：刷新/关闭不丢；恢复时只保留池子里还存在的 url
 // 同时同步服务端副本（POST /api/checked）—— agent 靠 GET /api/collected 的
-// checked 字段识别「过二筛岗位」，不同步它就看不见你勾了谁（2026-10-12 反馈）
+// checked 字段识别「过二筛岗位」，不同步它就看不见你勾了谁
 function saveChecked() {
   try { localStorage.setItem('checked-urls', JSON.stringify([...CHECKED])); } catch (_) {}
   fetch('/api/checked', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ urls: [...CHECKED] }) }).catch(() => {});
 }
 function restoreChecked() {
-  // 【2026-10-13】整体兜底：恢复勾选失败不该拖垮整个面板 ——
+  // 整体兜底：恢复勾选失败不该拖垮整个面板 ——
   // 曾因服务端 checkedUrls 类型不对（对象而非数组）在这里抛错，
   // 被全局异常处理渲染成「连不上本地服务」全屏错误页（实测踩到，
   // 表现为：界面全崩、读取意向方向后端明明成功却看不到结果）。
@@ -505,12 +505,12 @@ function updateSelInfo() {
 }
 function pickMode(m) {
   SEND_MODE = m;
-  savePref('sendMode', m);   // 记住发送方式（2026-10-13：刷新/重启后不变）
+  savePref('sendMode', m);   // 记住发送方式（刷新/重启后不变）
   document.querySelectorAll('#modes button').forEach(el => el.classList.toggle('on', el.dataset.mode === m));
 }
 
 // ---------- 发送记录 ----------
-// 三项统计（爬取 / 发送 / 放入输入框），每项含「总量 + 今日」（2026-10-13 已定）
+// 三项统计（爬取 / 发送 / 放入输入框），每项含「总量 + 今日」
 function fillRecStats(stats) {
   if (!stats) return;
   const set = (key, name) => {
@@ -549,12 +549,21 @@ async function renderRecords() {
 
 // ---------- 浏览器开关 ----------
 function showBrowserUI(on) {
-  $('browserBadge').style.display = on ? '' : 'none';
   $('btnCloseBrowser').style.display = on ? '' : 'none';
+  $('btnOpenBrowser').style.display = on ? 'none' : '';
+}
+// 「打开 BOSS」：用任务同款浏览器（同一 profile / 登录态）开一个 BOSS 窗口给你自己用，
+// 不跑任何爬取/发送。子进程 spawn 完就返回、真正打开是异步的 ——
+// 收尾会广播 browser-kept，届时按钮状态自动切到「关闭 BOSS」。
+async function openBrowser() {
+  const r = await api('/api/open-browser', { method: 'POST' });
+  if (!r.ok) { toast(r.error || '打开失败，再试一次'); return; }
+  toast(r.reused ? '浏览器已经开着（任务正在用它）' : '正在打开 BOSS…');
+  showBrowserUI(true);
 }
 async function closeBrowser() {
   const r = await api('/api/close-browser', { method: 'POST' });
-  if (r.ok) { toast('浏览器已关闭'); showBrowserUI(false); }
+  if (r.ok) { toast('BOSS 已关闭'); showBrowserUI(false); }
   else toast('关闭失败，再试一次');
 }
 
@@ -565,11 +574,14 @@ function applyState(s) {
   const [t, c] = map[s.status] || map.idle;
   $('statusBadge').textContent = t;
   $('statusBadge').className = 'badge ' + c;
+  // 刷新后按钮状态要跟服务端实际的开/关对齐 —— browser-kept/closed 事件只在实时切换时推送，
+  // 刷新不会重放，所以这里按 bootstrap/state 里的 browserOpen 兜底（未带该字段的局部 state 事件跳过）
+  if (s.browserOpen !== undefined) showBrowserUI(s.browserOpen);
 
   const busy = s.status !== 'idle' && s.status !== 'error';
   $('btnCollect').disabled = busy;
   $('btnStop').disabled = !busy;
-  // 「停止」按钮编排（2026-10-13 已定稿：不要暂停/继续，只保留停止）：
+  // 「停止」按钮编排（不要暂停/继续，只保留停止）：
   //   运行/暂停/停止中 → 显示「停止」
   //   空闲/出错 → 隐藏「停止」（只在任务运行时出现）
   // 点了停止 = 直接终止脚本，没爬完的不爬、没发完的不发。
@@ -641,11 +653,126 @@ function renderExpectError(msg) {
   box.innerHTML = `<span class="mini">读取失败：${esc(msg || '未知错误')}，<a href="javascript:loadExpects()" style="text-decoration:underline">重新读取</a></span>`;
 }
 
+// ---------- 岗位初筛：来源 chip 导航栏 + 筛选条件 ----------
+// 来源四选一（驱动隐藏的 select#collectSource，旧代码照常读它的 value）；
+// 筛选条件随来源变，每项各占一行、选项常显，选中的值直接拼进 BOSS 列表页 URL（源头过滤）。
+const SOURCE_ITEMS = [
+  { v: 'search', label: '搜索' },
+  { v: 'recommend', label: '推荐' },
+  { v: 'expect', label: '意向岗位' },
+  { v: 'fav', label: '收藏' },
+];
+// 筛选组：key = config.sourceFilters 里的键（就是 BOSS URL 参数名）
+//   searchOnly = true → 只有「搜索」来源有；from = 选项来源（options 的分组 / districts 区县表）
+// 注：不再有「薪资待遇」—— BOSS 选了「实习」后薪资档位仍是全职的月薪范围，
+// 对实习（日薪）没用，整组去掉。
+// 经验档位（BOSS experience 参数）：BOSS 上这组本来就是多选 —— 面板做成和
+// 「学历/规模/融资」一样的多选 chips，排在「学历要求」下面。选项用下面这张表（filters.json 里没有这组）。
+// 注意：它是「全局」设置（存 config.experience），不按来源存 —— 渲染与写回都单独处理
+// （见 renderFilterNav 的 from==='experience' 特判、toggleFilterValue 的同名分支）。
+const EXPERIENCE_OPTIONS = [
+  { code: '108', name: '在校生' },
+  { code: '102', name: '应届生' },
+  { code: '101', name: '经验不限' },
+  { code: '103', name: '1年以内' },
+  { code: '104', name: '1-3年' },
+  { code: '105', name: '3-5年' },
+  { code: '106', name: '5-10年' },
+  { code: '107', name: '10年以上' },
+];
+let EXP_CODES = [];   // 当前选中的经验档位码（来自 config.experience，逗号串拆开）
+// 写回 config.experience（逗号串；空串 = 不限）。全局设置，不随来源变。
+function saveExperience(v) {
+  EXP_CODES = String(v || '').split(',').map(s => s.trim()).filter(Boolean);
+  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ experience: EXP_CODES.join(',') }) }).catch(() => {});
+}
+
+const FILTER_GROUPS = [
+  { key: 'multiBusinessDistrict', label: '工作区域', searchOnly: true, from: 'districts' },
+  // 求职类型：BOSS 里这组互斥（点了全职就不能点实习），故 single=true 走单选
+  { key: 'jobType', label: '求职类型', from: 'options', optKey: 'jobType', single: true },
+  { key: 'degree', label: '学历要求', from: 'options', optKey: 'degree' },
+  { key: 'experience', label: '经验要求', from: 'experience' },   // 全局设置，非 sourceFilters
+  { key: 'scale', label: '公司规模', from: 'options', optKey: 'scale' },
+  { key: 'stage', label: '融资阶段', from: 'options', optKey: 'stage' },
+];
+// 有「源头筛选」的三个来源（收藏来源固定 URL、不吃筛选）；多来源共有的项要同步进这三个
+const FILTER_SOURCES = ['search', 'recommend', 'expect'];
+// 「多来源共有」= 搜索/推荐/意向都有的那一组（工作区域 searchOnly、经验要求另有全局存储 config.experience）
+function isSharedGroup(g) { return !!g && !g.searchOnly && g.from !== 'experience'; }
+function curSource() { const el = $('collectSource'); return el ? el.value : 'search'; }
+// 收藏来源不套任何筛选条件（固定收藏 URL），不显示任何筛选组
+function groupsForSource(src) { return src === 'fav' ? [] : FILTER_GROUPS.filter(g => !g.searchOnly || src === 'search'); }
+// 某筛选组的可选项 [{code,name}]；拿不到（filters.json 缺失 / 该市没区县）返回 []，前端降级
+function optionsOf(g, src) {
+  if (g.from === 'experience') return EXPERIENCE_OPTIONS;   // 这张表不依赖 filters.json
+  if (!FILTERS_DATA) return [];
+  if (g.from === 'districts') return ((FILTERS_DATA.districts || {})[String(CITY.code)]) || [];
+  return ((FILTERS_DATA.options || {})[g.optKey]) || [];
+}
+function pickedCodes(src, key) {
+  const v = (SOURCE_FILTERS[src] || {})[key] || '';
+  return String(v).split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function renderSourceNav() {
+  const box = $('sourceChips');
+  if (!box) return;
+  const cur = curSource();
+  box.innerHTML = '';
+  for (const it of SOURCE_ITEMS) {
+    const el = document.createElement('span');
+    el.className = 'chip' + (cur === it.v ? ' on' : '');
+    el.textContent = it.label;
+    el.onclick = () => pickSource(it.v);
+    box.appendChild(el);
+  }
+}
+
+// 每个筛选项各占一行：「标签 + 全部选项」常显（不再点开）
+function renderFilterNav() {
+  const box = $('filterBox');
+  if (!box) return;
+  const src = curSource();
+  box.innerHTML = '';
+  for (const g of groupsForSource(src)) {
+    const list = optionsOf(g, src);
+    const sel = g.from === 'experience' ? EXP_CODES.slice() : pickedCodes(src, g.key);
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.style.cssText = 'margin-bottom:8px; align-items:flex-start';
+    row.innerHTML = `<label class="fld" style="margin-top:5px">${esc(g.label)}</label>`;
+    const chips = document.createElement('div');
+    chips.className = 'chips';
+    // 「不限」= 清空这一项（对应接口里 code=0 的那个「不限」，统一由这里表示）
+    const none = document.createElement('span');
+    none.className = 'chip' + (sel.length ? '' : ' on');
+    none.textContent = '不限';
+    none.onclick = () => toggleFilterValue(g.key, '', true);
+    chips.appendChild(none);
+    for (const o of list) {
+      if (String(o.code) === '0') continue;
+      const el = document.createElement('span');
+      el.className = 'chip' + (sel.includes(String(o.code)) ? ' on' : '');
+      el.textContent = o.name;
+      el.onclick = () => toggleFilterValue(g.key, String(o.code));
+      chips.appendChild(el);
+    }
+    if (!list.length) {
+      const tip = g.from === 'districts' ? '这个城市没有可选的区县' : '拿不到这一项（可跑 node update-filters.js 刷新）';
+      chips.insertAdjacentHTML('beforeend', `<span class="mini">${esc(tip)}</span>`);
+    }
+    row.appendChild(chips);
+    box.appendChild(row);
+  }
+}
+
 // ---------- SSE ----------
 function connect() {
   const es = new EventSource('/api/events');
   let wasDown = false;
-  // 【2026-10-13 加固】断线重连后同步一次状态：SSE 断开期间（服务重启 / 网络抖动）
+  // 断线重连后同步一次状态：SSE 断开期间（服务重启 / 网络抖动）
   // 后端状态可能已经变了，前端不刷新就会一直显示旧状态 —— 按钮可用性错乱
   // （今天的「停止」点不了就是状态陈旧的同类问题：连状态都没收到过）
   es.onopen = () => {
@@ -676,7 +803,7 @@ function handle(ev) {
       break;
     case 'expects': {
       savePref('expectTabs', ev.tabs || []);   // 记住方向列表：刷新/重启后秒回，不必再读 BOSS
-      // 上次挑中的方向若还在新列表里 → 自动选回（2026-10-13：意向方向也要"刷新重启后不变"）
+      // 上次挑中的方向若还在新列表里 → 自动选回（意向方向也要"刷新重启后不变"）
       const saved = uiPrefs().expectTab || '';
       EXPECT_PICKED = (ev.tabs || []).includes(saved) ? saved : '';
       renderExpectChips(ev.tabs);
@@ -720,7 +847,7 @@ function handle(ev) {
       }
       break;
     case 'job-removed': {
-      // 子进程扫到下架岗位，server 删磁盘+内存后广播；面板跟着删掉（2026-10-13 已定）
+      // 子进程扫到下架岗位，server 删磁盘+内存后广播；面板跟着删掉
       const before = CANDS.length;
       CANDS = CANDS.filter((j) => j.url !== ev.url);
       CHECKED = new Set([...CHECKED].filter((u) => CANDS.some((j) => j.url === u)));
@@ -743,13 +870,14 @@ function handle(ev) {
       break;
     case 'checked-sync':
       // 远端勾选变更（agent 智能二筛 / 其他面板）。与本地一致 = 自己勾选广播
-      // 回来的回声，静默跳过；不一致才应用 —— 文案不指明谁勾的（已定）
+      // 回来的回声，静默跳过；不一致才应用 —— 文案不指明谁勾的
       {
         const inPool = new Set(CANDS.map(j => j.url));
         const next = new Set((ev.urls || []).filter(u => inPool.has(u)));
         const same = next.size === CHECKED.size && [...next].every(u => CHECKED.has(u));
         if (!same) {
           CHECKED = next;
+          saveChecked();   // 落 localStorage（否则刷新会被本机旧勾选覆盖、丢失这次变更）
           renderRows(); renderEditRows(); updateSelInfo();
           toast(`勾选已更新（${CHECKED.size} 个）`);
         }
@@ -855,7 +983,7 @@ function handle(ev) {
   }
 }
 async function refreshQuota() {
-  // 顶部「今日已发 X / 60」已按要求移除；本函数现在只刷记录页的三项统计
+  // 刷新记录页的三项统计
   try {
     const r = await api('/api/records');
     fillRecStats(r.stats);

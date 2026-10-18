@@ -1,5 +1,5 @@
 /**
- * 回归：设置页「手动保存 + 离开拦截」（2026-10-13 已定）
+ * 回归：设置页「手动保存 + 离开拦截」
  * 用法：先启动 server.js，再 node tests/verify-settings-save.js
  *
  * 覆盖：
@@ -19,7 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const DIR = path.join(__dirname, '..', '..');
-const CFG0 = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+const CFG0 = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
 let chromium;
 try { ({ chromium } = require('patchright')); } catch (_) { ({ chromium } = require('playwright-core')); }
 const { CHROME, sleep } = require('../../lib/utils');
@@ -35,7 +35,7 @@ const post = (p, b) => new Promise((res) => {
 
 let pass = 0, fail = 0;
 const ok = (c, name, extra = '') => { if (c) { pass++; console.log('  ✅ ' + name + (extra ? '  ' + extra : '')); } else { fail++; console.log('  ❌ ' + name + (extra ? '  ' + extra : '')); } };
-const cfgNow = () => JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+const cfgNow = () => JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
 
 (async () => {
   // 基线：把每日爬取上限固定成 80，让断言可预期
@@ -72,7 +72,7 @@ const cfgNow = () => JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), '
     const b = [...document.querySelectorAll('.setfoot button')].find((x) => new RegExp(pat).test(x.textContent));
     if (b) b.click();
   }, pattern);
-  // 自定义弹窗自动应答（core.js askBox，2026-10-13 起不用原生 confirm）：
+  // 自定义弹窗自动应答（core.js askBox，不用原生 confirm）：
 //   'yes' → 点「保存」（先落盘再离开）  'no' → 点「不保存」（放弃改动直接走）
   //   null  → 只观察不点（验证"弹窗确实出现"）
   let asks = [];
@@ -263,7 +263,7 @@ const cfgNow = () => JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), '
   const promptAfter = (await (await fetch(BASE + '/api/prompt')).json()).text;
   ok(promptAfter === promptBefore, '测试没写 prompts/greeting.md（改动还挂在设置页待保存）');
 
-  // ===== ⑦ 本页刷新：未保存改动不丢（2026-10-13 已定，取代原生刷新弹窗）=====
+  // ===== ⑦ 本页刷新：未保存改动不丢（取代原生刷新弹窗）=====
   console.log('\n===== ⑦ 本页刷新：未保存改动不丢 =====');
   // 先用「撤销改动」把 ⑥ 遗留的提示词改动丢掉，回到干净起点（顺带验证撤销会清草稿，不写文件）
   await clickBar('撤销');

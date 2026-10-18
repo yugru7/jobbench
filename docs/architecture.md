@@ -18,7 +18,7 @@
                                  └────────┬─────────┘                            你本机的 Google Chrome
                                           │ 读写                                  （独立 profile，不碰日常 Chrome）
                                           ▼
-                                   config.json / knowledge.json / prompts/
+                                   data/*.json / prompts/
                                    logs/*.json / logs/*.txt
 ```
 
@@ -38,10 +38,11 @@
 |---|---|
 | `server.js` | 装配依赖 → `http.createServer`（静态 → 路由分发 → 404）→ `listen`（≈ 110 行） |
 | `routes/index.js` | 路由表：key = 「方法 + 空格 + 路径」，value = `(req, res, body) => ...` |
-| `routes/*.js` | 每个 API 组一个文件（bootstrap / collected / checked / greetings / collect / send / config / prompt / knowledge / records / expects / pause / resume / stop / close-browser / events） |
+| `routes/*.js` | 每个 API 组一个文件（bootstrap / collected / checked / greetings / collect / send / config / prompt / knowledge / records / expects / pause / resume / stop / close-browser / open-browser / events） |
 | `lib/http.js` | `json()` / `readBody()` / **Host·Origin 白名单** / 静态文件（含路径穿越防护） |
 | `lib/state.js` | 可变 `state` + `broadcast` + SSE 订阅 + 事件缓冲（`seq` / `rid` 重放） |
-| `lib/store.js` | 路径常量 + `readJson` / `writeJson` + `settingsView` / `todayCount` 等 |
+| `lib/data-dir.js` | 数据目录（`data/`）常量 + 旧文件幂等自动迁移（模块加载即执行） |
+| `lib/store.js` | 路径常量（指向 `data/`）+ `readJson` / `writeJson` + `settingsView` / `loadFilters` / `todayCount` 等 |
 | `lib/runner.js` | 子进程编排（`startChild` / `sendCmd` / `stopChildAsync` / `killKeptBrowser`） |
 
 加新接口：写一个 `routes/xxx.js`（导出 `(deps) => async (req,res,body) => {...}`），在 `routes/index.js` 挂上 key 即可。
@@ -54,10 +55,10 @@
 | `lib/ipc.js` | IPC 协议（`@@IPC@@` 行格式）+ 暂停 / 停止控制、检查点 |
 | `lib/browser-session.js` | 连接 / 启动 Chrome、复用与保活、预热 |
 | `lib/login-guard.js` | 登录检查、安全验证处理与熔断 |
-| `lib/collect.js` | 采集：抓岗位卡片、进详情、读 JD 与招聘者活跃度、过滤去重 |
-| `lib/send.js` | 发送 / 填充流程（只填不发、逐条确认） |
+| `lib/collect.js` | 采集：抓岗位卡片（按需翻页 / 补滚）、进详情、读 JD 与招聘者活跃度、过滤去重 |
+| `lib/send.js` | 发送 / 填充流程（`fillOnly` 只填不发；`confirm` 直接逐条发送） |
 | `lib/pool.js` | 候选池落盘、按岗位 ID 去重合并、增量配额 |
-| 其余已有模块 | `args`（参数）/ `search`（搜索·意向）/ `page-helpers`（拟人操作）/ `greeting`（招呼语）/ `knowledge`（知识库）/ `blacklist`（黑名单）/ `lock`（单实例锁）/ `chrome-kill` / `utils` |
+| 其余已有模块 | `data-dir`（数据目录·迁移）/ `args`（参数）/ `search`（搜索·收藏 URL 与翻页·意向·源头筛选拼参）/ `page-helpers`（拟人操作）/ `greeting`（招呼语）/ `knowledge`（知识库）/ `blacklist`（黑名单）/ `lock`（单实例锁）/ `chrome-kill` / `utils` |
 
 > 约定：自包含子系统写成工厂函数 `module.exports = (deps) => { ... }`，由调用方注入依赖。
 
@@ -65,8 +66,10 @@
 
 | 文件 | 内容 | 是否进仓库 |
 |---|---|---|
-| `config.json` | 运行配置（默认值随仓库附带） | ✅ 是（默认值） |
-| `knowledge.json` | 你的知识库 | ❌ 否 |
+| `data/config.json` | 运行配置（默认值随仓库附带） | ✅ 是（默认值） |
+| `data/knowledge.json` | 你的知识库 | ❌ 否 |
+| `data/cities.json` | 城市列表（下拉数据源） | ✅ 是 |
+| `data/filters.json` | 岗位初筛筛选项（选项 + 区县） | ✅ 是 |
 | `prompts/*.md` | 招呼语 / 访谈提示词（面板可编辑） | ✅ 是 |
 | `logs/last-collect.json` | 候选池 | ❌ 否 |
 | `logs/run-*.log` | 运行日志 | ❌ 否 |

@@ -6,7 +6,7 @@ const fs = require('fs');
 module.exports = (deps) => async (req, res, body) => {
   const { paths, state, broadcast, json, startChild, readJson, localDate } = deps;
   const b = body;
-  // ---- 每日爬取上限（2026-10-13 设置页开放）----
+  // ---- 每日爬取上限 ----
   // 单次数量钳制（≤30）+「今日已爬 + 本次 ≤ dailyCollectCap」：
   // 超出自动收窄，已满直接拒绝（放在设「运行中」之前，拒绝时状态不动）
   const capCfg = readJson(paths.CONFIG_FILE, {});
@@ -33,18 +33,19 @@ module.exports = (deps) => async (req, res, body) => {
   state.status = 'running';
   state.startedAt = Date.now();
   state.stopRequested = false;   // 新任务：重置停止标记
-  // 【2026-10-13 修】设了状态必须广播（同 /api/expects 的注释：漏广播 →
+  // 设了状态必须广播（同 /api/expects 的注释：漏广播 →
   // 前端按钮停在初始禁用态，「停止」点不了）
   broadcast({ t: 'state', status: 'running' });
 
   const args = ['--mode=collect'];
-  // 参数钳制（2026-10-12 安全审计）：单次爬取 ≤30 个、关键词 ≤10 个 ——
+  // 参数钳制：单次爬取 ≤30 个、关键词 ≤10 个 ——
   // 防agent/API 误传大参数导致长时间高频操作 BOSS（风控风险）；
   // 数量已在上面的「每日爬取上限」检查中定稿（runMaxJobs）
   args.push('-n', String(runMaxJobs));
-  if (b.source === 'recommend' || b.source === 'expect') args.push(`--source=${b.source}`);
+  // fav（我的收藏）：固定 URL 来源，和 recommend / expect 一样不需要关键词
+  if (b.source === 'recommend' || b.source === 'expect' || b.source === 'fav') args.push(`--source=${b.source}`);
   if (b.source === 'expect' && b.expectTab) args.push('--expect-tab', String(b.expectTab));
-  else if (b.source !== 'recommend' && b.source !== 'expect' && Array.isArray(b.keywords) && b.keywords.length) {
+  else if (b.source !== 'recommend' && b.source !== 'expect' && b.source !== 'fav' && Array.isArray(b.keywords) && b.keywords.length) {
     args.push('--keywords', b.keywords.slice(0, 10).join(','));
   }
   if (b.cityCode) args.push('--city-code', String(b.cityCode));

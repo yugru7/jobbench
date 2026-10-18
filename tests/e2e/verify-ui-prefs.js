@@ -1,5 +1,5 @@
 /**
- * 回归：界面习惯记忆（2026-10-13 已定：刷新 / 重启后保持当前状态）
+ * 回归：界面习惯记忆（刷新 / 重启后保持当前状态）
  * 用法：先启动 server.js，再 node tests/verify-ui-prefs.js
  *
  * 覆盖：
@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const DIR = path.join(__dirname, '..', '..');
-const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
 let chromium;
 try { ({ chromium } = require('patchright')); } catch (_) { ({ chromium } = require('playwright-core')); }
 const { CHROME, sleep } = require('../../lib/utils');

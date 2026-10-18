@@ -1,5 +1,5 @@
 /**
- * 回归：设置页四项微调（2026-10-13 反馈）
+ * 回归：设置页四项微调
  *   ① 输入框离标签太远 → gap/min-width 收紧
  *   ② 删掉底部那两行小字
  *   ③ 句号前的说明文字与标签字号统一（12px → 13px）
@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const DIR = path.join(__dirname, '..', '..');
-const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
 let chromium;
 try { ({ chromium } = require('patchright')); } catch (_) { ({ chromium } = require('playwright-core')); }
 const { CHROME, sleep } = require('../../lib/utils');
@@ -18,7 +18,7 @@ const { killChromeUsingProfile } = require('../../lib/chrome-kill')(CFG.profileD
 
 let pass = 0, fail = 0;
 const ok = (c, n, e = '') => { if (c) { pass++; console.log('  ✅ ' + n + (e ? '  ' + e : '')); } else { fail++; console.log('  ❌ ' + n + (e ? '  ' + e : '')); } };
-const cfgNow = () => JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+const cfgNow = () => JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
 
 (async () => {
   const before = cfgNow();

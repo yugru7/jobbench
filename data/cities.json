@@ -1,5 +1,5 @@
 {
-  "_source": "BOSS直聘 /wapi/zpCommon/data/city.json（2026-10-11 本地重建）",
+  "_source": "BOSS直聘 /wapi/zpCommon/data/city.json（本地重建）",
   "_note": "provinces = 省份→城市两级（共 34 省 / 373 城）；hot = 热门城市（已剔除\"全国\"）；code 即 BOSS 搜索 URL 的 city 参数",
   "hot": [
     {

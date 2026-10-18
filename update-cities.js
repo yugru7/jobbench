@@ -1,8 +1,9 @@
-// 刷新 BOSS 城市列表 → cities.json（省份→城市两级，界面先选省再选市）
+// 刷新 BOSS 城市列表 → data/cities.json（省份→城市两级，界面先选省再选市）
 // 用法：node update-cities.js             联网抓最新（无需登录）
 //       node update-cities.js --from-raw  用 logs 里已存的原始响应本地重建（不联网）
 const fs = require('fs');
 const path = require('path');
+const { DATA_DIR } = require('./lib/data-dir');   // 数据文件统一放 data/
 const RAW = path.join(__dirname, 'logs', 'city-raw_wapi_zpCommon_data_city_json.json');
 
 async function fetchText() {
@@ -45,11 +46,11 @@ async function fetchText() {
     .filter(p => p.cities.length);
   const total = provinces.reduce((s, p) => s + p.cities.length, 0);
   const out = {
-    _source: `BOSS直聘 /wapi/zpCommon/data/city.json（${new Date().toISOString().slice(0, 10)} ${fromRaw ? '本地重建' : '抓取'}）`,
+    _source: `BOSS直聘 /wapi/zpCommon/data/city.json（${fromRaw ? '本地重建' : '抓取'}）`,
     _note: `provinces = 省份→城市两级（共 ${provinces.length} 省 / ${total} 城）；hot = 热门城市（已剔除"全国"）；code 即 BOSS 搜索 URL 的 city 参数`,
     hot,
     provinces,
   };
-  fs.writeFileSync(path.join(__dirname, 'cities.json'), JSON.stringify(out, null, 2), 'utf8');
-  console.log(`已更新 cities.json：${provinces.length} 个省份 / ${total} 个城市（热门 ${hot.length}）`);
+  fs.writeFileSync(path.join(DATA_DIR, 'cities.json'), JSON.stringify(out, null, 2), 'utf8');
+  console.log(`已更新 data/cities.json：${provinces.length} 个省份 / ${total} 个城市（热门 ${hot.length}）`);
 })().catch(e => { console.log('失败: ' + e.message); process.exit(1); });

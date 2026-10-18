@@ -1,5 +1,5 @@
 /**
- * 回归：设置页布局（2026-10-13 反馈）
+ * 回归：设置页布局
  *   ① 「保存设置的按钮还是没有」→ 之前做成"改了才出现"，等于没有按钮
  *   ② 「这两句中间间隔太大了」→ .setu 写了 flex:1 1 240px 撑开整行
  * 定稿方案：不做底部悬浮栏，保存 / 撤销 按钮并入「恢复默认设置」那一行，
@@ -9,7 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const DIR = path.join(__dirname, '..', '..');
-const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+const CFG = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
 let chromium;
 try { ({ chromium } = require('patchright')); } catch (_) { ({ chromium } = require('playwright-core')); }
 const { CHROME, sleep } = require('../../lib/utils');
@@ -19,7 +19,7 @@ let pass = 0, fail = 0;
 const ok = (c, n, e = '') => { if (c) { pass++; console.log('  ✅ ' + n + (e ? '  ' + e : '')); } else { fail++; console.log('  ❌ ' + n + (e ? '  ' + e : '')); } };
 
 (async () => {
-  const before = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+  const before = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
   const browser = await chromium.launchPersistentContext(CFG.profileDir, {
     executablePath: CHROME, headless: false, viewport: { width: 1400, height: 900 },
     args: ['--disable-blink-features=AutomationControlled'],
@@ -75,7 +75,7 @@ const ok = (c, n, e = '') => { if (c) { pass++; console.log('  ✅ ' + n + (e ? 
   ok(idle.footShown, '底部操作行存在且可见');
   ok(idle.saveExists && idle.revertExists, '保存 / 撤销 两个按钮都在');
   ok(idle.sameRow, '「保存设置」与「恢复默认设置」在同一行');
-  // 设置页不在 .wp 列表里（不锁高），内容可滚动是设计如此：
+  // 设置页白盒默认一屏高，但表单内容比一屏高 → 卡片被内容顶长、整页可滚动是设计如此：
   // 按钮在内容流末尾，滚动到底必须能看到、且点得到
   const reach = await page.evaluate(() => {
     const foot = document.querySelector('.setfoot');
@@ -109,7 +109,7 @@ const ok = (c, n, e = '') => { if (c) { pass++; console.log('  ✅ ' + n + (e ? 
   console.log('\n===== ④ 保存 → 落盘并回到置灰 =====');
   await page.evaluate(() => { document.getElementById('btnSaveSettings').click(); });
   await sleep(1800);
-  const disk = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
+  const disk = JSON.parse(fs.readFileSync(path.join(DIR, 'data', 'config.json'), 'utf8'));
   const saved = await page.evaluate(() => ({
     saveDisabled: document.getElementById('btnSaveSettings').disabled,
     hint: (document.getElementById('setDirtyHint') || {}).textContent,
@@ -158,7 +158,7 @@ const ok = (c, n, e = '') => { if (c) { pass++; console.log('  ✅ ' + n + (e ? 
 
   console.log('\n===== 汇总 =====');
   console.log('PASS ' + pass + ' / FAIL ' + fail);
-  fs.writeFileSync(path.join(DIR, 'config.json'), JSON.stringify(before, null, 2), 'utf8');
+  fs.writeFileSync(path.join(DIR, 'data', 'config.json'), JSON.stringify(before, null, 2), 'utf8');
   console.log('配置已还原');
   await browser.close();
   await killChromeUsingProfile();

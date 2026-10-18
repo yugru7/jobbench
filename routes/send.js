@@ -1,7 +1,7 @@
 /**
  * POST /api/send —— 阶段二：发送
  * ----------------------------------------------------------------------------
- * 安全护栏（2026-10-12 审计）：
+ * 安全护栏：
  *   ① mode=auto（全自动点发送）必须带 userApproved:true —— 只有面板上用户
  *      亲自在确认弹窗点了「确定」才带；agent 按 AGENTS.md 只能用 fillOnly/confirm
  *   ② 数量双保险：硬顶 60 条 + 按「今日剩余额度」截断（todayCount 已发的不算）
@@ -40,7 +40,7 @@ module.exports = (deps) => async (req, res, body) => {
   state.awaiting = null;
   state.sendMode = mode;
   state.stopRequested = false;   // 新任务：重置停止标记
-  // 【2026-10-13 修】设了状态必须广播（同上：漏广播 → 「停止」按钮点不了）
+  // 设了状态必须广播（同上：漏广播 → 「停止」按钮点不了）
   broadcast({ t: 'state', status: 'running' });
   state.sendProgress = { index: 0, total: items.length, sent: 0, skipped: 0, failed: 0, filled: 0, current: '', company: '' };
 

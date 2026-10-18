@@ -1,9 +1,9 @@
 # 知识库访谈引导 —— prompts/knowledge-interview.md
 
-> 给 AI agent 用：通过一轮对话（很像一次面试）把用户的真实经历整理进 `knowledge.json`。
+> 给 AI agent 用：通过一轮对话（很像一次面试）把用户的真实经历整理进 `data/knowledge.json`。
 > 目标是"用户只是聊天，知识库就填好了"。
 
-## 目标结构（knowledge.json）
+## 目标结构（data/knowledge.json）
 
 - `profile`：我是谁 —— 只有一个字段 identity，尽量写全：身份/学校专业/可实习时间/到岗情况/意向城市（例：计算机相关专业应届生，可实习6个月、每周5天，意向北京）。字段没有字数上限，细节越多，招呼语越有得挑
 - `skills`：技能列表，顿号或逗号分隔（如 `Java、Spring Boot、Vue3、MySQL、Nginx`）
@@ -29,9 +29,9 @@
 
 ## 写回工具（面板实时刷新）
 
-- 面板开着时：`POST http://127.0.0.1:7788/api/knowledge`，body 是**完整的** knowledge.json 内容
-- 面板没开时：直接写 `knowledge.json` 文件（UTF-8；结构说明在文件里的 `_说明` 字段）
-- 首次使用（没有 knowledge.json）时，可以参考 `knowledge.example.json` 的格式
+- 面板开着时：`POST http://127.0.0.1:7788/api/knowledge`，body 是**完整的**知识库内容
+- 面板没开时：直接写 `data/knowledge.json` 文件（UTF-8；结构说明在文件里的 `_说明` 字段）
+- 首次使用（没有 data/knowledge.json）时，可以参考 `data/knowledge.example.json` 的格式
 
 ## 完成后的收尾
 

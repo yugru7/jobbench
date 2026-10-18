@@ -7,13 +7,33 @@
   "cityName": "",
   "_cityName说明": "用于本地二次校验，过滤掉混进来的外地岗。跟随面板里选的城市。",
   "experience": "",
-  "_experience说明": "BOSS 经验档位（留空 = 不限，返回全部经验档；常用值：108=在校/应届、102=1-3年、103=3-5年）。可在面板「岗位初筛」页直接选。",
+  "_experience说明": "BOSS 经验档位（留空 = 不限，返回全部经验档）。值：108=在校生 / 102=应届生 / 101=经验不限 / 103=1年以内 / 104=1-3年 / 105=3-5年 / 106=5-10年 / 107=10年以上；逗号可多选（如 108,102 = 在校生+应届）。可在面板「岗位初筛」页直接选。",
+  "sourceFilters": {
+    "search": {
+      "multiBusinessDistrict": "",
+      "jobType": "",
+      "degree": "",
+      "scale": "",
+      "stage": ""
+    },
+    "recommend": {
+      "multiBusinessDistrict": "",
+      "jobType": "",
+      "degree": "",
+      "scale": "",
+      "stage": ""
+    },
+    "expect": {
+      "multiBusinessDistrict": "",
+      "jobType": "",
+      "degree": "",
+      "scale": "",
+      "stage": ""
+    }
+  },
+  "_sourceFilters说明": "各来源（search / recommend / expect）在面板「岗位初筛」选的筛选条件，会拼进 BOSS 列表页 URL 从源头过滤（不符合的岗位根本不进候选池）。空串 = 不限。键 = URL 参数名：multiBusinessDistrict(工作区域，仅 search 有，值为区县码，逗号可多选) / jobType(求职类型) / degree(学历) / scale(公司规模) / stage(融资阶段)；经验档位见上面的 experience。",
   "keywords": [],
   "_keywords说明": "逐个搜索，串行执行。关键词在面板「岗位初筛」页填写后写回这里。",
-  "requireInTitle": [],
-  "_requireInTitle说明": "【硬性要求】职位名必须包含其中任一词，否则跳过。BOSS的experience过滤不严，本地再过一道，确保只投实习岗。",
-  "excludeKeywords": [],
-  "_excludeKeywords说明": "职位名或公司名命中任一词就跳过。新增了一批销售/社招过滤词。",
   "dailyCap": 60,
   "_dailyCap说明": "每日发送上限（工具软拦截，到量自动停）。已定 60 先试：少量多次节奏，触发验证多就再降。",
   "maxJobsPerRun": 10,
@@ -23,7 +43,7 @@
   "delayTailRatio": 0.25,
   "delayTailMinSec": 6,
   "delayTailMaxSec": 12,
-  "_delay说明": "【发送】岗位间隔 = 长尾两段（2026-10-13 已定）。75% 走 delayMinSec~delayMaxSec（4-6秒，干脆利落），25% 走 delayTailMinSec~delayTailMaxSec（6-12秒，像被别的事拖了一下），平均约 6 秒。为什么不用单段均匀：均匀分布每个值等概率，本身就是机器特征；真人间隔是长尾的（多数短、偶尔长）。若触发验证：先把 delayTailRatio 提到 0.4，或把主段抬到 6-10。",
+  "_delay说明": "【发送】岗位间隔 = 长尾两段。75% 走 delayMinSec~delayMaxSec（4-6秒，干脆利落），25% 走 delayTailMinSec~delayTailMaxSec（6-12秒，像被别的事拖了一下），平均约 6 秒。为什么不用单段均匀：均匀分布每个值等概率，本身就是机器特征；真人间隔是长尾的（多数短、偶尔长）。若触发验证：先把 delayTailRatio 提到 0.4，或把主段抬到 6-10。",
   "collectDelayMinSec": 4,
   "collectDelayMaxSec": 7,
   "collectDelayTailRatio": 0.25,
