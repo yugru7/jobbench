@@ -79,7 +79,7 @@
         <p class="abli"><b>1 备好知识库</b>：填「我是谁 / 我的经历 / 我的技能」，也可让 agent 访谈式帮你补全；它是招呼语取材的唯一来源</p>
         <p class="abli"><b>2 岗位初筛</b>：来源（搜索 / 推荐 / 意向方向 / 收藏）、城市、单次数量；搜索模式下填投递关键词</p>
         <p class="abli"><b>3 爬岗位</b>：自动逐个打开岗位页，读出 JD、薪资、招聘者活跃度、公司规模与行业，进候选池</p>
-        <p class="abli"><b>4 二次筛选</b>：按类型 / 活跃度 / 薪资 / 规模 / 行业 / 双休过滤排序，勾选要投的；也可让 agent 智能评分勾选</p>
+        <p class="abli"><b>4 二次筛选</b>：按活跃度 / 双休 / 日薪 / 行业过滤，勾选要投的；也可让 agent 智能勾选</p>
         <p class="abli"><b>5 写招呼语</b>：勾选岗位逐条生成定制版（对准这条 JD，不是群发模板），可手改，自动保存</p>
         <p class="abli"><b>6 发送</b>：默认「放到输入框」填好就停，你在浏览器里过目后自己点发送；全过程留痕到「记录」</p>
 
@@ -149,8 +149,8 @@
         <p class="abli">「删除选中」删除前会自动备份到 <b>logs/last-collect.json.bak</b>；就算 agent 在命令行偷偷爬，面板也能检测到并自动并入候选池</p>
 
         <p class="absec">④ 二次筛选</p>
-        <p class="abli"><b>筛选器</b>：类型（实习 / 全职自动判定）、活跃度（刚刚 / 今日 / 3日内 / 本周）、双休（有 = 每周 ≤5 天，无 = 每周 ≥6 天）、日薪下限（月薪自动折算日薪）、公司规模（BOSS 原生档位精确匹配）、行业关键词</p>
-        <p class="abli"><b>排序</b>：默认 / 活跃度优先 / 薪资优先；<b>已发送的岗位自动隐藏</b>，不再出现在候选里</p>
+        <p class="abli"><b>筛选器</b>：活跃度（今日活跃 / 3日内活跃 / 本周活跃 / 半年内活跃，选某档即该档及更新）、双休（有 = 每周 ≤5 天，无 = 每周 ≥6 天）、日薪下限（月薪自动折算日薪）、行业关键词</p>
+        <p class="abli"><b>已发送的岗位自动隐藏</b>，不再出现在候选里</p>
         <p class="abli"><b>勾选</b>：单个点勾 / 按筛选结果全选 / 清空勾选；勾选会被记住，刷新不丢</p>
         <p class="abli"><b>让 agent 智能二筛</b>：它搜公司背景、按你知识库评岗位匹配度，自动勾上匹配度高的（面板实时可见，不满意直接改成你要的）</p>
         <p class="abli">筛选条件本身也会被记住，下次打开还是这套</p>
@@ -277,8 +277,10 @@
         <label class="fld">活跃度</label>
         <select id="fActive" onchange="renderRows()" style="min-width:140px">
           <option value="">不限</option>
-          <option value="hot">仅 刚刚/今日活跃</option>
-          <option value="mid">放宽到 3日内/本周</option>
+          <option value="today">今日活跃</option>
+          <option value="d3">3日内活跃</option>
+          <option value="week">本周活跃</option>
+          <option value="halfyear">半年内活跃</option>
         </select>
         <label class="fld">双休</label>
         <select id="fWeek" onchange="renderRows()" style="min-width:130px">

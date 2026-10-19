@@ -30,7 +30,7 @@ const { spawn } = require('child_process');
 // ---------- 浏览器驱动选型（关键）----------
 // 用 Patchright（Playwright 的官方反检测分支），而不是原生 Playwright。
 //
-// A/B 实测对照（同一台机器、同样启动参数、同一个 URL，唯一变量是驱动）：
+// A/B 对照（同一台机器、同样启动参数、同一个 URL，唯一变量是驱动）：
 //   原生 Playwright → 36 秒内被 BOSS 踢了 52 次，最后卡片 0 个
 //   Patchright      → 36 秒内只导航 6 次，卡片稳定 17 个
 //

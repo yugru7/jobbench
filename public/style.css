@@ -22,8 +22,8 @@
     --r-ctl: 8px;
     --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
     --ease: cubic-bezier(.22, 1, .36, 1);
-    --hd: 70px;   /* header 占位（高度+下边距），boot() 会实测覆盖 */
-    --hdr: 45px;  /* 纯 header 高度（sticky 页签定位用），boot() 会实测覆盖 */
+    --hd: 70px;   /* header 占位（高度+下边距），boot() 会覆盖 */
+    --hdr: 45px;  /* 纯 header 高度（sticky 页签定位用），boot() 会覆盖 */
     --pgap: 12px; /* 页内留白：白盒与上方页签、与窗口底部的间距（两处必须同源，才对称） */
   }
   html, body { margin: 0; padding: 0; }
@@ -94,7 +94,7 @@
   .rectable .rnone { padding: 28px 10px; text-align: center; color: var(--ink-3); }
 
   /* ---------- 页签 + 分页（知识库 + 工作台四步） ---------- */
-  /* 任一页面激活时 #mainWrap 定高（--hd = header 占位，boot() 实测）→ 页面恒占一屏。
+  /* 任一页面激活时 #mainWrap 定高（--hd = header 占位，boot() 覆盖）→ 页面恒占一屏。
      所有页面统一走这一条 —— 「白盒有默认高度」= 卡片默认撑到接近窗口底部，
      内容少的页面不再是「半截白盒」；内容超出则靠卡片默认 min-height:auto（=内容高）自然顶长，
      整页照常滚动（不会被压扁、不会截断） */

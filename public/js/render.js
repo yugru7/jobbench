@@ -201,6 +201,15 @@ function actClass(a) {
   if (/日内活跃|本周活跃/.test(a)) return ['mid', a];
   return ['cold', a];
 }
+// 二筛「活跃度」按 BOSS 自己的档位分档（从近到远），**选某档 = 该档及更新的一律留下**。
+// 用「包含匹配」而不是等值：BOSS 的实际文案多变（刚刚 / 今日 / N日内 / N周内 / 本月 / N月内 / 半年前活跃），
+// 采集端已把真实文案整串存进 job.active，这里只做归组。
+const ACTIVE_TIERS = {
+  today: /刚刚活跃|今日活跃/,
+  d3: /刚刚活跃|今日活跃|\d+\s*[日天]内活跃/,
+  week: /刚刚活跃|今日活跃|\d+\s*[日天]内活跃|本周活跃|\d+\s*周内活跃/,
+  halfyear: /刚刚活跃|今日活跃|\d+\s*[日天]内活跃|本周活跃|\d+\s*周内活跃|\d+\s*个?月内活跃|本月活跃|近期活跃|半年前活跃|半年内活跃/,
+};
 // ---- 二次筛选：从候选里挑出真正想投的 ----
 // 薪资文本 → 折算日薪（元/天）。支持 150-200元/天、5-8K、8千-1.2万 这类格式；
 // 解析不出来返回 0（筛选时不受影响）
@@ -228,10 +237,10 @@ function visibleCands() {
   // 注：不再按「实习/全职」分 —— 关键词判定会把
   // 「实习生勿投 / 不招实习生」这类否定句也算成实习，不可靠，交给人自己看。
   let list = CANDS.map((j, i) => ({ j, i }));
-  // 已发送的直接不进二筛/编辑视图（已定：大概率爬不到了，留着纯噪音）
+  // 已发送的直接不进二筛/编辑视图（大概率爬不到了，留着纯噪音）
   list = list.filter(x => !x.j.sent);
-  if (act === 'hot') list = list.filter(x => /刚刚活跃|今日活跃/.test(x.j.active || ''));
-  else if (act === 'mid') list = list.filter(x => /刚刚活跃|今日活跃|3日内活跃|本周活跃/.test(x.j.active || ''));
+  // 活跃度：按 BOSS 档位链（今日 / 3日内 / 本周 / 半年内），选某档 = 该档及更新
+  if (ACTIVE_TIERS[act]) list = list.filter(x => ACTIVE_TIERS[act].test(x.j.active || ''));
 
   // 日薪下限：工资文本解析出来的才比，没解析出来的不受影响
   if (salMin > 0) list = list.filter(x => { const d = salaryDaily(x.j.salary); return d === 0 || d >= salMin; });
@@ -443,14 +452,14 @@ function saveChecked() {
 function restoreChecked() {
   // 整体兜底：恢复勾选失败不该拖垮整个面板 ——
   // 曾因服务端 checkedUrls 类型不对（对象而非数组）在这里抛错，
-  // 被全局异常处理渲染成「连不上本地服务」全屏错误页（实测踩到，
+  // 被全局异常处理渲染成「连不上本地服务」全屏错误页（曾踩到，
   // 表现为：界面全崩、读取意向方向后端明明成功却看不到结果）。
   try {
     let fromStorage = null;
     try {
       const arr = JSON.parse(localStorage.getItem('checked-urls') || 'null');
       // 注意：空数组 [] 不算「用户的有效选择」——旧版刷新 bug 会把空数组写进
-      // localStorage，若当事实源就会把 agent 勾的覆盖掉（实测刷新即丢）
+      // localStorage，若当事实源就会把 agent 勾的覆盖掉（刷新即丢）
       if (Array.isArray(arr) && arr.length) fromStorage = arr;
     } catch (_) {}
     const urls = new Set(CANDS.map(j => j.url));

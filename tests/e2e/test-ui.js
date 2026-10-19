@@ -75,8 +75,8 @@ const CHROME_PATHS = [
       cardW: cardW('pageDir') || cardW('pageFetch') || cardW('pageFilter') || cardW('pageEdit') || cardW('pageSend') || cardW('pageRecords'),
       kbCardW: cardW('pageKb'),
       // 可见文案 em-dash 统计：textContent 层面遍历、跳过 .jdcell（JD 摘要是
-      // BOSS 原文，外部数据里的「——」不该算自家文案违规——实测
-      // 基恩公司 JD 自带「——」误报过一次）
+      // BOSS 原文，外部数据里的「——」不该算自家文案违规；
+      // 曾有公司 JD 自带「——」被误报过一次）
       emDash: (() => {
         let n = 0;
         const walk = (el) => {
@@ -87,7 +87,7 @@ const CHROME_PATHS = [
               // SCRIPT/STYLE（代码注释不算 UI 文案）、TEXTAREA（提示词长文档是
               // 用户可编辑内容，里面的「——」是用户的自由，不算文案违规）、
               // jdcell（JD 摘要是 BOSS 外部数据）、jobname/rjob（岗位名也是 BOSS
-              // 外部数据 —— 实测「某岗位名(实习生)——某届」误报过）
+              // 外部数据 —— 含「——」的岗位名会被误报）
               if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEXTAREA'
                 || node.classList.contains('jdcell')
                 || node.classList.contains('jobname')

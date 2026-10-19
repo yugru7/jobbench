@@ -7,7 +7,7 @@
 ## 环境要求
 
 - **仅支持 Windows**（关闭 BOSS、清理残留进程等用了 PowerShell，macOS / Linux 未适配）
-- **Node.js 18+**（开发环境实测 v24）
+- **Node.js 18+**（开发环境 v24）
 - **本机已装 Google Chrome**：工具只驱动你本机的 Chrome，不额外下载浏览器内核
 - 联网环境 + 一个 BOSS直聘 账号（首次扫码登录一次，之后复用本地浏览器配置目录）
 

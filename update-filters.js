@@ -82,7 +82,7 @@ function toOptions(list) {
       + Object.keys(zp).slice(0, 40).join(', '));
     process.exit(1);
   }
-  // 接口的 jobTypeList 只给「全职 / 兼职」，不含「实习」（实测 1902 = 实习有效）——
+  // 接口的 jobTypeList 只给「全职 / 兼职」，不含「实习」（1902 = 实习有效）——
   // 本工具的典型场景是找实习，补上这个已知有效值（不覆盖接口给的其它值）
   if (Array.isArray(options.jobType) && !options.jobType.some(o => o.name.includes('实习'))) {
     options.jobType.push({ code: '1902', name: '实习' });

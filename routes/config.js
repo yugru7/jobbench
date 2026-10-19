@@ -22,7 +22,7 @@ module.exports = (deps) => async (req, res, body) => {
   if (b.cityName !== undefined) cfg.cityName = String(b.cityName || '');
   // 经验档位：BOSS 的 experience 参数，允许空串（不限）
   // 或逗号分隔的合法档位码（如 108,102 = 在校生+应届 —— BOSS 支持多选）
-  // 档位码（实测）：101 经验不限 / 102 应届生 / 103 1年以内 / 104 1-3年 / 105 3-5年 / 106 5-10年 / 107 10年以上 / 108 在校生
+  // 档位码：101 经验不限 / 102 应届生 / 103 1年以内 / 104 1-3年 / 105 3-5年 / 106 5-10年 / 107 10年以上 / 108 在校生
   if (b.experience !== undefined) {
     const v = String(b.experience || '').replace(/[^0-9,]/g, '').slice(0, 60);
     const ALLOWED = ['101', '102', '103', '104', '105', '106', '107', '108'];

@@ -20,7 +20,7 @@ module.exports = (deps) => async (req, res, body) => {
   state.error = '';
   state.stopRequested = false;   // 新任务：重置停止标记
   // 设了状态必须广播，否则前端仍以为空闲 —— 「停止」按钮停在
-  // 初始禁用态点不了（实测：爬取中鼠标是圈斜线、点了没反应）
+  // 初始禁用态点不了（爬取中鼠标是圈斜线、点了没反应）
   broadcast({ t: 'state', status: 'running' });
   try {
     await startChild(['--mode=expects'], '读取意向方向');

@@ -16,7 +16,7 @@ async function collect() {
   const kws = [...SELECTED];
   if (source === 'search' && !kws.length) { toast('至少选一个投递方向（或把来源切到「推荐」）'); return; }
   if (source === 'expect' && !EXPECT_PICKED) { toast('先去「岗位初筛」页点选一个意向方向'); return; }
-  // 单次爬取硬钳制在 10：input 的 max 属性拦不住手动输入（已定：少量多次，一次最多 10）
+  // 单次爬取硬钳制在 10：input 的 max 属性拦不住手动输入（少量多次，一次最多 10）
   const maxJobs = Math.min(parseInt($('maxJobs').value, 10) || 10, 10);
   const args = {
     source, keywords: kws, maxJobs,
@@ -484,7 +484,7 @@ async function saveSettings() {
   } finally { setSaving = false; updateSetBar(); }
 }
 
-// 恢复默认：只重置数值参数，不碰提示词 / 城市 / 知识库（已定：各自独立重置）。
+// 恢复默认：只重置数值参数，不碰提示词 / 城市 / 知识库（各自独立重置）。
 // 立刻落盘（是明确的破坏性操作），不跟其他改动一起等保存
 async function resetSettings() {
   if (!confirm('恢复默认设置？\n\n只重置限额 / 间隔 / 防护参数，不影响招呼语提示词、城市和知识库。\n（立即生效，不用再点保存）')) return;
@@ -554,7 +554,7 @@ function renderKnowledge(k) {
   K.profile = K.profile || {};
   if (!K.profile.identity && K.person && K.person.intro) K.profile.identity = K.person.intro;
   K.entries = normalizeEntries(K.entries);
-  // 「我是谁」单框（已定：不分四类）；旧格式 status/city/note 自动并入 identity
+  // 「我是谁」单框（不分四类）；旧格式 status/city/note 自动并入 identity
   if (!K.profile.identity && (K.profile.status || K.profile.city || K.profile.note)) {
     K.profile.identity = [K.profile.status, K.profile.city && `意向${K.profile.city}`, K.profile.note]
       .filter(Boolean).join('，');
@@ -590,7 +590,7 @@ function delEntry(i) { if (confirm('删除这条经历？')) { K.entries.splice(
 // ---------- 知识库：边写边存（方案 B）----------
 // 去掉「保存知识库」按钮：任何改动停手约 0.9 秒后静默写入 knowledge.json。
 // 存的是服务端文件，所以刷新 / 切页签 / 关掉面板都不会丢。
-// 静默 = 成功不弹 toast（已定：不要状态提示），失败才提示。
+// 静默 = 成功不弹 toast（不要状态提示），失败才提示。
 let kbTimer = 0;
 function kbTouch() { clearTimeout(kbTimer); kbTimer = setTimeout(() => { kbTimer = 0; saveKnowledge(true); }, 900); }
 // 离开知识库页 / 关闭页面时，把还没到点的那一笔立刻冲出去（sendBeacon 能随页面关闭发出）
@@ -617,7 +617,7 @@ function kbPayload() {
   delete K._isExample;   // 存过就是正式数据了
   delete K.person;       // 旧字段已迁进 profile
   delete K.tone;         // 口吻段已去掉（相关规则内置到 AI 生成里）
-  delete K.template;     // 兜底模板已去掉（句式写死在代码里，已定：没必要可配）
+  delete K.template;     // 兜底模板已去掉（句式写死在代码里，没必要可配）
   delete K.fallback;
   K.entries = K.entries.filter(en => (en.title || '').trim() || (en.content || '').trim());
   return K;
@@ -647,7 +647,7 @@ boot().then(() => {
   //   ① bootstrap 都拿不到（服务没起来 / 面板被双击打开）→ 整页引导卡片：
   //      这时界面确实没数据可用，得明确告诉用户怎么启动服务；
   //   ② 服务是通的、只是初始化某一步抛错 → 只在标题后红字提示，页面主体照常。
-  //   之前两者共用整页错误卡片：一个字段类型不对就把整个界面吞了（实测踩到，
+  //   之前两者共用整页错误卡片：一个字段类型不对就把整个界面吞了（曾踩到，
   //   表现为「读取意向方向后端明明成功却什么都看不到」）。
   if (e && e.__bootFailed) {
     document.querySelector('.wrap').innerHTML = `

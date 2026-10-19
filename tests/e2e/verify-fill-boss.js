@@ -2,7 +2,7 @@
  * 真实环境诊断脚本：招呼语填充（只填不发，不产生任何真实投递）
  * ----------------------------------------------------------------------------
  * 用途：换填充方案 / 改 fillGreeting 后，在真实 BOSS 页面上验证三件事：
- *   1) 聊天输入框类型（实测是 DIV.chat-input contenteditable）
+ *   1) 聊天输入框类型（DIV.chat-input contenteditable）
  *   2) 填充内容是否与目标严格一致（分块粘贴最容易错的就是这里）
  *   3) 填完后发送按钮是否可用（BOSS 空内容时 btn-send 带 disabled 类）
  * 用法：node tests/verify-fill-boss.js   （需要浏览器已有登录态；跑 3 轮）
