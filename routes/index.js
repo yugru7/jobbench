@@ -23,6 +23,7 @@ module.exports = (deps) => {
     'GET /api/events': require('./events')(deps),
     'POST /api/expects': require('./expects')(deps),
     'POST /api/collect': require('./collect')(deps),
+    'POST /api/reread': require('./reread')(deps),
     'POST /api/send': require('./send')(deps),
     'POST /api/pause': require('./pause')(deps),
     'POST /api/resume': require('./resume')(deps),

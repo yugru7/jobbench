@@ -59,7 +59,7 @@ const SKIP_FILE = path.join(LOG_DIR, '黑名单.txt');   // 反复失败的岗�
 const {
   DRY_RUN, USE_CDP, CDP_PORT, FORCE_MAX, KW_INDEX, FORCE_KEYWORD, FORCE_KEYWORDS,
   FORCE_CITY_CODE, FORCE_CITY_NAME, SOURCE, EXPECT_TAB,
-  MODE, SEND_LIST_FILE, CONFIRM_EACH, FILL_ONLY, CLOSE_BROWSER, KEEP_OPEN_MAX_MS, hasFlag,
+  MODE, REREAD_SCOPE, SEND_LIST_FILE, CONFIRM_EACH, FILL_ONLY, CLOSE_BROWSER, KEEP_OPEN_MAX_MS, hasFlag,
 } = require('./lib/args');
 const { acquireLock, releaseLock } = require('./lib/lock')(CFG.profileDir);
 const { loadSkipList, saveSkipList, markFail } = require('./lib/blacklist')(SKIP_FILE);
@@ -230,6 +230,14 @@ const send = require('./lib/send')({
 // 「打开 BOSS」模式：只把浏览器带到 BOSS 首页，不跑任何任务（见 lib/open-browser.js）
 const openBrowser = require('./lib/open-browser')({ rt, log });
 
+// 「刷新活跃度」模式：重开候选池岗位的详情页重读招聘者活跃度，只回写 active/activeRaw
+// （范围由 REREAD_SCOPE 决定：unsent = 所有未发送（强刷）/ empty = 只补空的。见 lib/reread-active.js）
+const rereadActive = require('./lib/reread-active')({
+  rt, CFG, LOG_DIR, log, ipcEmit, checkpoint, sleep, StoppedError,
+  gotoWithGuard, isKickedToLogin, sec, paceRand, nextCollectDelaySec, listReferer,
+  humanWheelScroll,
+});
+
 
 // ============================================================================
 
@@ -302,6 +310,10 @@ async function main() {
     await rt.closer();
     return;
   }
+
+  // ---------- 模式：刷新候选池活跃度（维护用，只回写 active/activeRaw）----------
+  // 不搜索、不发送，只把池子里的岗位逐个重开详情页重读（见 lib/reread-active.js）
+  if (MODE === 'reread') { await rereadActive.runRereadMode(REREAD_SCOPE); await rt.closer(); return; }
 
   // ---------- 模式：只读意向岗位页签（来源「意向页签」第一步，几秒就完）----------
   // 【注意】必须放在搜索流程之前 —— 下面有个 jobs.length===0 的退出守卫，

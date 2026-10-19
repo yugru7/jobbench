@@ -79,9 +79,10 @@
         <p class="abli"><b>1 备好知识库</b>：填「我是谁 / 我的经历 / 我的技能」，也可让 agent 访谈式帮你补全；它是招呼语取材的唯一来源</p>
         <p class="abli"><b>2 岗位初筛</b>：来源（搜索 / 推荐 / 意向方向 / 收藏）、城市、单次数量；搜索模式下填投递关键词</p>
         <p class="abli"><b>3 爬岗位</b>：自动逐个打开岗位页，读出 JD、薪资、招聘者活跃度、公司规模与行业，进候选池</p>
-        <p class="abli"><b>4 二次筛选</b>：按活跃度 / 双休 / 日薪 / 行业过滤，勾选要投的；也可让 agent 智能勾选</p>
+        <p class="abli"><b>4 二次筛选</b>：按活跃度（今日活跃（含在线）/ 3日内 / 本周 / 半年内四档，<b>各档互不包含</b>）/ 双休 / 日薪 / 行业过滤，勾选要投的；也可让 agent 智能勾选</p>
         <p class="abli"><b>5 写招呼语</b>：勾选岗位逐条生成定制版（对准这条 JD，不是群发模板），可手改，自动保存</p>
         <p class="abli"><b>6 发送</b>：默认「放到输入框」填好就停，你在浏览器里过目后自己点发送；全过程留痕到「记录」</p>
+        <p class="abli"><b>候选池存的是「爬取那一刻」的快照</b>，放久了活跃度会失真；「设置」页可一键<b>刷新未发送岗位的活跃度</b>（逐个重开详情页重读，分批执行、可随时停止，只回写活跃度）</p>
 
         <p class="absec">哪里需要 agent，agent 能做什么</p>
         <p class="abp">机械活工具自己干，判断活交给 agent；两者分工明确，你随时能接管。</p>
@@ -93,9 +94,9 @@
         <p class="absec">账号安全性防护</p>
         <p class="abli"><b>来源层</b>：面板与接口只受理来自本机的请求（Host / Origin 白名单，只认 127.0.0.1 / localhost）。恶意网页打不开你的接口，伪装域名（DNS 重绑定）也读不到你的知识库、清不掉你的候选池；命令行与 agent 正常调用不受影响</p>
         <p class="abli"><b>驱动层</b>：用 Patchright（Playwright 的反检测分支），不产生 CDP 自动化痕迹；跑的是你自己的 Chrome 配置目录，指纹与登录态都是真实的</p>
-        <p class="abli"><b>行为层</b>：点击带鼠标轨迹与随机落点（含真实按压时长）、滚动有速度包络与微动、招呼语分块粘贴模拟人工输入、看岗位有停顿（默认停留 1~2 秒、滚轮滑动 300~700 像素）、岗位间隔随机：爬取默认 4~7 秒（约 25% 概率进入 7~11 秒的「偶尔慢一点」）、发送默认 4~6 秒（约 25% 概率进入 6~12 秒）</p>
+        <p class="abli"><b>行为层</b>：点击带鼠标轨迹与随机落点（含真实按压时长）、滚动有速度包络与微动、招呼语分块粘贴模拟人工输入、看岗位有停顿（默认停留 1~2 秒、滚轮滑动 300~700 像素）、岗位间隔随机：爬取默认 4~7 秒（约 25% 概率进入 7~11 秒的「偶尔慢一点」）、发送默认 4~6 秒（约 25% 概率进入 6~12 秒）；<b>刷新活跃度复用同一套节奏</b>（看岗位的停留与滚轮、岗位间隔都跟爬取共用同一组参数）</p>
         <p class="abli"><b>预热</b>：全新启动浏览器时，任务开头会随机打开一个常见网站（百度 / 必应 里随机选一个）停留一两秒，再进 BOSS。既让首页渲染完整（不预热容易只加载出一两张卡片），也避免「直奔目标站」这种脚本特征；浏览器已是热的（复用来的）则直接跳过预热</p>
-        <p class="abli"><b>限额层</b>：每日发送上限（默认 60）、每日爬取上限（默认 80）、单次爬取上限（少量多次，服务端硬顶 30）；发送时按当日剩余额度自动截断</p>
+        <p class="abli"><b>限额层</b>：每日发送上限（默认 60）、每日爬取上限（默认 80）、单次爬取上限（少量多次，服务端硬顶 30）；发送时按当日剩余额度自动截断。<b>刷新活跃度另有独立闸门</b>（一次最多刷 / 每批刷 / 批间休息，设置页可调）</p>
         <p class="abli"><b>流程层</b>：默认「只填不发」；「直接发送」必须你本人在面板上亲自确认；遇到安全验证会停下等你人工完成；反复失败的岗位进黑名单不再触碰</p>
 
         <p class="absec">数据放在哪（都在本地）</p>
@@ -144,14 +145,14 @@
         <p class="absec">③ 获取岗位</p>
         <p class="abli">点「搜索岗位 / 爬推荐岗位 / 爬意向岗位 / 爬收藏岗位」启动浏览器自动化，逐个打开岗位详情页，自动读出 <b>JD 正文、薪资、招聘者活跃度、公司规模、行业</b></p>
         <p class="abli">爬完进<b>候选池</b>：跨批次累积、按岗位去重（重复的不占名额，自动补足目标数量）；<b>加载深度按需</b>——按你要的数量自动决定翻页 / 滚动到哪，够了就停，不把隐藏的岗位一次性全抓完；你改过的招呼语和勾选绝不会被重爬覆盖</p>
-        <p class="abli"><b>候选池里是「爬取那一刻」的快照</b>：BOSS 上这些岗位会实时变动（招满、下架、改要求），本工作台看不到后续变化；建议爬到的岗位<b>尽早发送</b>，别囤太久</p>
+        <p class="abli"><b>候选池里是「爬取那一刻」的快照</b>：BOSS 上这些岗位会实时变动（招满、下架、改要求），本工作台看不到后续变化；建议爬到的岗位<b>尽早发送</b>，别囤太久。<b>放久了活跃度会失真</b>，可到「设置」页点「刷新未发送岗位的活跃度」逐个重开详情页重读（只回写活跃度，不动勾选 / 招呼语 / 发送状态；分批执行、可随时「停止」）</p>
         <p class="abli">任务运行时顶栏显示「运行中」，可随时点「停止」（直接终止，没爬完的就不再爬）</p>
         <p class="abli">「删除选中」删除前会自动备份到 <b>logs/last-collect.json.bak</b>；就算 agent 在命令行偷偷爬，面板也能检测到并自动并入候选池</p>
 
         <p class="absec">④ 二次筛选</p>
-        <p class="abli"><b>筛选器</b>：活跃度（今日活跃 / 3日内活跃 / 本周活跃 / 半年内活跃，选某档即该档及更新）、双休（有 = 每周 ≤5 天，无 = 每周 ≥6 天）、日薪下限（月薪自动折算日薪）、行业关键词</p>
+        <p class="abli"><b>筛选器</b>：活跃度（今日活跃（含在线）/ 3日内活跃 / 本周活跃 / 半年内活跃，<b>各档互不包含</b>，选哪档只看哪档）、双休（有 = 每周 ≤5 天，无 = 每周 ≥6 天）、日薪下限（月薪自动折算日薪）、行业关键词</p>
         <p class="abli"><b>已发送的岗位自动隐藏</b>，不再出现在候选里</p>
-        <p class="abli"><b>勾选</b>：单个点勾 / 按筛选结果全选 / 清空勾选；勾选会被记住，刷新不丢</p>
+        <p class="abli"><b>勾选</b>：单个点勾 / 按筛选结果全选（= 勾选集合直接换成当前筛选结果，之前勾的、不在结果里的会被取消）/ 清空勾选；勾选会被记住，刷新不丢</p>
         <p class="abli"><b>让 agent 智能二筛</b>：它搜公司背景、按你知识库评岗位匹配度，自动勾上匹配度高的（面板实时可见，不满意直接改成你要的）</p>
         <p class="abli">筛选条件本身也会被记住，下次打开还是这套</p>
 
@@ -177,7 +178,8 @@
 
         <p class="absec">⑧ 设置</p>
         <p class="abli"><b>限额</b>：一次最多爬 / 一天最多爬 / 一天最多发；出厂默认是 10 / 80 / 60，都能按你的情况调</p>
-        <p class="abli"><b>节奏</b>：发送与爬取的间隔（大多数时候几秒、偶尔慢一点的占比与时长）、沟通前在 JD 页面停留、爬取时停留与滚轮滑动</p>
+        <p class="abli"><b>节奏</b>：发送与爬取的间隔（大多数时候几秒、偶尔慢一点的占比与时长）、沟通前在 JD 页面停留、看岗位时停留与滚轮滑动（<b>爬取与刷新活跃度共用这组节奏参数</b>）</p>
+        <p class="abli"><b>刷新活跃度</b>：一次最多刷（0 = 不限，全部未发送的都刷）、每批刷几个、批间休息几秒；按钮「刷新未发送岗位的活跃度」就在这一段里</p>
         <p class="abli">改动后点「保存设置」生效；没保存就切页会提示，选「不保存」则还原；本页刷新也不会丢未保存的改动；「撤销改动」「恢复默认设置」随时可用</p>
 
         <p class="absec">顶栏状态</p>
@@ -277,7 +279,7 @@
         <label class="fld">活跃度</label>
         <select id="fActive" onchange="renderRows()" style="min-width:140px">
           <option value="">不限</option>
-          <option value="today">今日活跃</option>
+          <option value="today">今日活跃（含在线）</option>
           <option value="d3">3日内活跃</option>
           <option value="week">本周活跃</option>
           <option value="halfyear">半年内活跃</option>
@@ -420,7 +422,7 @@
             <span class="setu">秒</span></div>
         </div>
 
-        <p class="absec">爬取岗位</p>
+        <p class="absec">爬取 / 刷新岗位</p>
         <div class="setgrid">
           <div class="setrow"><span class="setk">大多数时候</span>
             <input type="number" id="setCollectDelayMinSec" min="1" max="60" step="0.5" oninput="setDirty()"> ~
@@ -432,14 +434,29 @@
             <input type="number" id="setCollectDelayTailMinSec" min="1" max="60" step="0.5" oninput="setDirty()"> ~
             <input type="number" id="setCollectDelayTailMaxSec" min="1" max="300" step="0.5" oninput="setDirty()">
             <span class="setu">秒</span></div>
-          <div class="setrow"><span class="setk">在 JD 页面停留</span>
+          <div class="setrow"><span class="setk">看岗位时停留</span>
             <input type="number" id="setReadPauseMinSec" min="0" max="10" step="0.1" oninput="setDirty()"> ~
             <input type="number" id="setReadPauseMaxSec" min="0" max="30" step="0.1" oninput="setDirty()">
-            <span class="setu">秒</span></div>
+            <span class="setu">秒（爬取 / 刷新共用）</span></div>
           <div class="setrow"><span class="setk">停留时滚轮滑动</span>
             <input type="number" id="setReadScrollMinPx" min="0" max="3000" step="50" oninput="setDirty()"> ~
             <input type="number" id="setReadScrollMaxPx" min="0" max="5000" step="50" oninput="setDirty()">
-            <span class="setu">像素</span></div>
+            <span class="setu">像素（爬取 / 刷新共用）</span></div>
+        </div>
+
+        <p class="absec">刷新活跃度</p>
+        <div class="setgrid">
+          <div class="setrow"><span class="setk">一次最多刷</span>
+            <input type="number" id="setRereadMaxPerRun" min="0" max="300" oninput="setDirty()">
+            <span class="setu">个（0 = 不限，全部）</span></div>
+          <div class="setrow"><span class="setk">每批刷</span>
+            <input type="number" id="setRereadBatchSize" min="1" max="30" oninput="setDirty()">
+            <span class="setu">个，批间休息</span>
+            <input type="number" id="setRereadBatchGapMinSec" min="0" max="600" step="1" oninput="setDirty()"> ~
+            <input type="number" id="setRereadBatchGapMaxSec" min="0" max="900" step="1" oninput="setDirty()">
+            <span class="setu">秒</span></div>
+          <div class="setrow">
+            <button onclick="refreshActive()">刷新未发送岗位的活跃度</button></div>
         </div>
 
         <p class="absec">候选池</p>

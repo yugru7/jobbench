@@ -62,6 +62,12 @@ module.exports = (deps) => async (req, res, body) => {
   if (b.readScrollMinPx !== undefined) cfg.readScrollMinPx = clampInt(b.readScrollMinPx, 0, 3000, 300);
   if (b.readScrollMaxPx !== undefined) cfg.readScrollMaxPx = clampInt(b.readScrollMaxPx, 0, 5000, 700);
 
+  // 刷新活跃度（维护）专属：单次上限（0 = 不限，全刷）/ 每批条数 / 批间休息
+  if (b.rereadMaxPerRun !== undefined) cfg.rereadMaxPerRun = clampInt(b.rereadMaxPerRun, 0, 300, 0);
+  if (b.rereadBatchSize !== undefined) cfg.rereadBatchSize = clampInt(b.rereadBatchSize, 1, 30, 10);
+  if (b.rereadBatchGapMinMs !== undefined) cfg.rereadBatchGapMinMs = clampInt(b.rereadBatchGapMinMs, 0, 600000, 30000);
+  if (b.rereadBatchGapMaxMs !== undefined) cfg.rereadBatchGapMaxMs = clampInt(b.rereadBatchGapMaxMs, 0, 900000, 90000);
+
   // 配对钳制：min > max 自动把 max 抬上来，不丢用户意图（比把 min 压下去温和）
   // 必须在所有单值 clamp 之后做，确保两边都是合法数字
   const pairClamp = (...[a, b]) => { if (cfg[a] > cfg[b]) cfg[b] = cfg[a]; };
@@ -72,6 +78,7 @@ module.exports = (deps) => async (req, res, body) => {
   pairClamp('clickPauseMinMs', 'clickPauseMaxMs');
   pairClamp('readPauseMinMs', 'readPauseMaxMs');
   pairClamp('readScrollMinPx', 'readScrollMaxPx');
+  pairClamp('rereadBatchGapMinMs', 'rereadBatchGapMaxMs');
 
   // 源头筛选：各来源（search/recommend/expect）在面板初筛页选的筛选条件，
   // 键 = BOSS 列表页 URL 参数名；值只允许数字/逗号（档位码、区县码，含多选）—— 防注入其它查询参数

@@ -49,7 +49,7 @@
   "collectDelayTailRatio": 0.25,
   "collectDelayTailMinSec": 7,
   "collectDelayTailMaxSec": 11,
-  "_collectDelay说明": "【爬取】读 JD 之间的岗位间隔，同样长尾两段：75% 走 4-7 秒、25% 走 7-11 秒，平均约 6.4 秒 —— 原来是 4-9 秒均匀（平均 6.5 秒），量级不变，只把上限抬 2 秒用来分长尾。",
+  "_collectDelay说明": "【爬取 / 刷新岗位共用】读 JD 之间的岗位间隔，长尾两段：75% 走 4-7 秒、25% 走 7-11 秒，平均约 6.4 秒。为什么不用单段均匀：均匀分布每个值等概率，本身就是机器特征；真人间隔是长尾的（多数短、偶尔长）。若触发验证：先把长尾占比提到 0.4，或把主段抬到 6-10。刷新活跃度重开详情页时也走这组间隔。",
   "jobRetryPerJob": 2,
   "_jobRetryPerJob说明": "单个岗位最多尝试几次。BOSS风控下第3次基本也没戏，改2次快速失败、快速换下一个，比死磕省时间。",
   "skipFailedAfter": 2,
@@ -65,8 +65,13 @@
   "_clickPause说明": "点「立即沟通」前的停留（毫秒，设置页可调）。真人会先扫一眼 JD 再点；默认 0~2000。",
   "readPauseMinMs": 1000,
   "readPauseMaxMs": 2000,
-  "_readPause说明": "阅读 JD 时的停顿（毫秒，设置页可调）。滚一段停一下，像真人看岗位；默认 1000~2000，长 JD 会再滚一次再停一次。",
+  "_readPause说明": "【爬取 / 刷新岗位共用】看岗位时在详情页停留的时长（毫秒，设置页可调）。滚一段停一下，像真人看岗位；默认 1000~2000。爬取的 JD 正文长时会再滚一次再停一次。",
   "readScrollMinPx": 300,
   "readScrollMaxPx": 700,
-  "_readScroll说明": "阅读 JD 时的滚动距离（像素，设置页可调）。默认 300~700；长 JD（正文超 800 字）第二次滚动为此距离的 1.5 倍。"
+  "_readScroll说明": "【爬取 / 刷新岗位共用】看岗位时拟人滚轮滚动的距离（像素，设置页可调）。默认 300~700；爬取的 JD 正文超 800 字时，第二次滚动为此距离的 1.5 倍。",
+  "rereadMaxPerRun": 0,
+  "rereadBatchSize": 10,
+  "rereadBatchGapMinMs": 30000,
+  "rereadBatchGapMaxMs": 90000,
+  "_reread说明": "【刷新活跃度（维护）】面板设置页同名那一组。rereadMaxPerRun = 一次点击最多刷多少个（0 = 不限，把所有未发送的都刷）；rereadBatchSize = 每批刷多少个，一批刷完休息一段再继续；rereadBatchGapMinMs / rereadBatchGapMaxMs = 批间休息时长（毫秒，默认 30~90 秒）。刷新只回写岗位的 active / activeRaw，不动勾选 / 招呼语 / 发送状态；岗位下架或失效会直接从候选池删掉。"
 }

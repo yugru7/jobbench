@@ -56,6 +56,8 @@
 | `lib/browser-session.js` | 连接 / 启动 Chrome、复用与保活、预热 |
 | `lib/login-guard.js` | 登录检查、安全验证处理与熔断 |
 | `lib/collect.js` | 采集：抓岗位卡片（按需翻页 / 补滚）、进详情、读 JD 与招聘者活跃度、过滤去重 |
+| `lib/job-active.js` | 详情页招聘者活跃度的页面侧读取（结构化定位 `.boss-active-time` / `.boss-online-tag`），采集与刷新共用 |
+| `lib/reread-active.js` | 刷新候选池「未发送」岗位的活跃度（按批刷新 + 批间休息、可停止；只回写 `active` / `activeRaw`；下架即删池） |
 | `lib/send.js` | 发送 / 填充流程（`fillOnly` 只填不发；`confirm` 直接逐条发送） |
 | `lib/pool.js` | 候选池落盘、按岗位 ID 去重合并、增量配额 |
 | 其余已有模块 | `data-dir`（数据目录·迁移）/ `args`（参数）/ `search`（搜索·收藏 URL 与翻页·意向·源头筛选拼参）/ `page-helpers`（拟人操作）/ `greeting`（招呼语）/ `knowledge`（知识库）/ `blacklist`（黑名单）/ `lock`（单实例锁）/ `chrome-kill` / `utils` |

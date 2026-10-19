@@ -162,6 +162,26 @@ async function send() {
 // 后端收到 STOP 后在最近的检查点干净收尾（预热/岗位之间都能及时响应）。
 async function stop() { await api('/api/stop', { method: 'POST' }); toast('正在停止…'); }
 
+// 刷新未发送岗位的活跃度（维护动作）：池里的活跃度是采集时的快照，放久了会失真。
+// 会真的逐个重开详情页重读 —— 浏览节奏与爬取同源（参数在设置页「爬取 / 刷新岗位」那一组）。
+// 过程中可在顶栏点「停止」；停止后再点一次 = 从头重新开始（不做断点续传）。
+async function refreshActive() {
+  if (STARTING) return;
+  const st = BOOT && BOOT.state ? BOOT.state.status : 'idle';
+  if (st !== 'idle' && st !== 'error') { toast('任务正在跑，等它结束或点「停止」'); return; }
+  const unsent = CANDS.filter(j => !j.sent).length;
+  if (!unsent) { toast('池子里没有未发送的岗位'); return; }
+  if (!confirm(`刷新 ${unsent} 个未发送岗位的活跃度？会逐个重开详情页重读（浏览节奏与爬取相同），过程中可随时「停止」。`)) return;
+  STARTING = true;
+  let r;
+  try {
+    r = await api('/api/reread', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope: 'unsent' }) });
+  } finally { STARTING = false; }
+  if (!r.ok) { toast(r.error || '刷新启动失败'); return; }
+  toast('正在刷新活跃度…（可在顶栏点「停止」）');
+}
+
 // 清理已发送（从池子里移除 sent 岗位——发了的大概率爬不到，留着占地方；先备份 .bak）
 async function clearSent() {
   const sentCount = CANDS.filter(j => j.sent).length;
@@ -258,11 +278,13 @@ const SET_FIELDS = [
   'collectDelayTailMinSec', 'collectDelayTailMaxSec',
   'clickPauseMinMs', 'clickPauseMaxMs', 'readPauseMinMs', 'readPauseMaxMs',
   'readScrollMinPx', 'readScrollMaxPx',
+  'rereadMaxPerRun', 'rereadBatchSize', 'rereadBatchGapMinMs', 'rereadBatchGapMaxMs',
 ];
 // 界面 id 用的键（毫秒字段在界面上叫 ...Sec，因为用户填的是秒）
 const SET_UI_KEY = {
   clickPauseMinMs: 'clickPauseMinSec', clickPauseMaxMs: 'clickPauseMaxSec',
   readPauseMinMs: 'readPauseMinSec', readPauseMaxMs: 'readPauseMaxSec',
+  rereadBatchGapMinMs: 'rereadBatchGapMinSec', rereadBatchGapMaxMs: 'rereadBatchGapMaxSec',
 };
 const setElId = (key) => 'set' + key.charAt(0).toUpperCase() + key.slice(1);
 
@@ -290,6 +312,7 @@ const SET_DEFAULTS = {
   collectDelayTailMinSec: 7, collectDelayTailMaxSec: 11,
   clickPauseMinMs: 0, clickPauseMaxMs: 2000, readPauseMinMs: 1000, readPauseMaxMs: 2000,
   readScrollMinPx: 300, readScrollMaxPx: 700,
+  rereadMaxPerRun: 0, rereadBatchSize: 10, rereadBatchGapMinMs: 30000, rereadBatchGapMaxMs: 90000,
 };
 
 function fillSettings(cfg) {
@@ -307,7 +330,7 @@ let SET_DIRTY = false;
 let setSaving = false;
 const setDirty = () => { if (SET_SAVED) { SET_DIRTY = true; saveDraft(); updateSetBar(); } };
 
-// 界面当前值（换算成 config 单位）——只取设置页那 19 个字段
+// 界面当前值（换算成 config 单位）——只取 SET_FIELDS 里那些设置页字段
 function collectSettings() {
   const out = {};
   for (const k of SET_FIELDS) {
@@ -329,7 +352,7 @@ function markSaved(cfg) {
 // 用 sessionStorage（不是 localStorage）：同一标签页刷新能留住，关掉标签页就没了——
 // 正好对上"刷新不掉、不保存切走则还原"的语义，也避免草稿跨会话残留。
 const DRAFT_KEY = 'settings-draft';
-function collectUI() {   // 19 个字段的界面当前值（含非法中间态，原样存）
+function collectUI() {   // SET_FIELDS 各字段的界面当前值（含非法中间态，原样存）
   const out = {};
   for (const k of SET_FIELDS) { const el = $(setElId(SET_UI_KEY[k] || k)); if (el) out[el.id] = el.value; }
   return out;
@@ -385,7 +408,7 @@ async function loadSettings() {
 // 「撤销改动」= 丢弃未保存草稿，回到服务端已保存的值（也会清掉刷新用的草稿）
 function revertSettings() { clearDraft(); loadSettings(); }
 
-// 一键保存：设置页 19 个字段 + 招呼语提示词，一次性落盘。
+// 一键保存：设置页全部字段 + 招呼语提示词，一次性落盘。
 // 用服务端回传的值回填（钳制后的结果）—— 保证「界面显示 = 实际生效」
 async function saveSettings() {
   if (setSaving) return;
@@ -405,17 +428,21 @@ async function saveSettings() {
     { el: 'setDelayTailRatio',      label: '发送间隔·长尾占比', min: 0,    max: 100,  step: 5,   suffix: '%' },
     { el: 'setDelayTailMinSec',     label: '发送间隔·长尾下限', min: 1,    max: 60,   step: 0.5 },
     { el: 'setDelayTailMaxSec',     label: '发送间隔·长尾上限', min: 1,    max: 300,  step: 0.5 },
-    { el: 'setCollectDelayMinSec',  label: '爬取间隔·短段下限', min: 1,    max: 60,   step: 0.5 },
-    { el: 'setCollectDelayMaxSec',  label: '爬取间隔·短段上限', min: 1,    max: 120,  step: 0.5 },
-    { el: 'setCollectDelayTailRatio', label: '爬取间隔·长尾占比', min: 0,  max: 100,  step: 5,   suffix: '%' },
-    { el: 'setCollectDelayTailMinSec', label: '爬取间隔·长尾下限', min: 1,  max: 60,   step: 0.5 },
-    { el: 'setCollectDelayTailMaxSec', label: '爬取间隔·长尾上限', min: 1,  max: 300,  step: 0.5 },
+    { el: 'setCollectDelayMinSec',  label: '爬取/刷新间隔·短段下限', min: 1,    max: 60,   step: 0.5 },
+    { el: 'setCollectDelayMaxSec',  label: '爬取/刷新间隔·短段上限', min: 1,    max: 120,  step: 0.5 },
+    { el: 'setCollectDelayTailRatio', label: '爬取/刷新间隔·长尾占比', min: 0,  max: 100,  step: 5,   suffix: '%' },
+    { el: 'setCollectDelayTailMinSec', label: '爬取/刷新间隔·长尾下限', min: 1,  max: 60,   step: 0.5 },
+    { el: 'setCollectDelayTailMaxSec', label: '爬取/刷新间隔·长尾上限', min: 1,  max: 300,  step: 0.5 },
     { el: 'setClickPauseMinSec',    label: '沟通前在 JD 页面停留·下限', min: 0,    max: 5,    step: 0.1, unit: '秒' },
     { el: 'setClickPauseMaxSec',    label: '沟通前在 JD 页面停留·上限', min: 0,    max: 10,   step: 0.1, unit: '秒' },
-    { el: 'setReadPauseMinSec',     label: '在 JD 页面停留·下限',       min: 0,    max: 10,   step: 0.1, unit: '秒' },
-    { el: 'setReadPauseMaxSec',     label: '在 JD 页面停留·上限',       min: 0,    max: 30,   step: 0.1, unit: '秒' },
+    { el: 'setReadPauseMinSec',     label: '看岗位时停留·下限',         min: 0,    max: 10,   step: 0.1, unit: '秒' },
+    { el: 'setReadPauseMaxSec',     label: '看岗位时停留·上限',         min: 0,    max: 30,   step: 0.1, unit: '秒' },
     { el: 'setReadScrollMinPx',     label: '停留时滚轮滑动·下限',       min: 0,    max: 3000, step: 50,  unit: '像素' },
     { el: 'setReadScrollMaxPx',     label: '停留时滚轮滑动·上限',       min: 0,    max: 5000, step: 50,  unit: '像素' },
+    { el: 'setRereadMaxPerRun',     label: '刷新活跃度·一次最多刷',     min: 0,    max: 300,  step: null },
+    { el: 'setRereadBatchSize',     label: '刷新活跃度·每批条数',       min: 1,    max: 30,   step: null },
+    { el: 'setRereadBatchGapMinSec', label: '刷新活跃度·批间休息下限',  min: 0,    max: 600,  step: 1,   unit: '秒' },
+    { el: 'setRereadBatchGapMaxSec', label: '刷新活跃度·批间休息上限',  min: 0,    max: 900,  step: 1,   unit: '秒' },
   ];
   for (const c of SINGLE_CHECKS) {
     const el = $(c.el);
@@ -443,11 +470,12 @@ async function saveSettings() {
   const PAIR_CHECKS = [
     ['发送间隔·短段',      'setDelayMinSec',              'setDelayMaxSec'],
     ['发送间隔·长尾',      'setDelayTailMinSec',          'setDelayTailMaxSec'],
-    ['爬取间隔·短段',      'setCollectDelayMinSec',       'setCollectDelayMaxSec'],
-    ['爬取间隔·长尾',      'setCollectDelayTailMinSec',   'setCollectDelayTailMaxSec'],
+    ['爬取/刷新间隔·短段',      'setCollectDelayMinSec',       'setCollectDelayMaxSec'],
+    ['爬取/刷新间隔·长尾',      'setCollectDelayTailMinSec',   'setCollectDelayTailMaxSec'],
     ['沟通前在 JD 页面停留',   'setClickPauseMinSec',        'setClickPauseMaxSec'],
-    ['在 JD 页面停留',           'setReadPauseMinSec',          'setReadPauseMaxSec'],
+    ['看岗位时停留',             'setReadPauseMinSec',          'setReadPauseMaxSec'],
     ['停留时滚轮滑动',           'setReadScrollMinPx',          'setReadScrollMaxPx'],
+    ['刷新活跃度·批间休息',      'setRereadBatchGapMinSec',     'setRereadBatchGapMaxSec'],
   ];
   for (const [label, minId, maxId] of PAIR_CHECKS) {
     const a = parseFloat($(minId).value), b = parseFloat($(maxId).value);
