@@ -819,7 +819,10 @@ function handle(ev) {
       applyState({ status: ev.status, sendProgress: null, awaiting: null });
       break;
     case 'collect-start':
-      $('collectHint').textContent = `正在读取 JD（目标新增 ${ev.total} 个，重复自动补位）…`;
+      // mode:'reread' = 刷新活跃度（不是往池子里加岗位，文案不能说「新增」）
+      $('collectHint').textContent = ev.mode === 'reread'
+        ? `正在刷新活跃度（共 ${ev.total} 个，只回写活跃度，不新增岗位）…`
+        : `正在读取 JD（目标新增 ${ev.total} 个，重复自动补位）…`;
       break;
     case 'expects': {
       savePref('expectTabs', ev.tabs || []);   // 记住方向列表：刷新/重启后秒回，不必再读 BOSS
@@ -836,9 +839,11 @@ function handle(ev) {
     }
     case 'collect-progress':
       // skipped：重复岗位跳过（不占新增配额，脚本会自动往后补位）
-      $('collectHint').textContent = ev.skipped
-        ? `已在池子里，跳过：${ev.current}（自动补下一位…）`
-        : `[新增 ${ev.index}/${ev.total}] ${ev.current}`;
+      $('collectHint').textContent = ev.mode === 'reread'
+        ? `[刷新 ${ev.index}/${ev.total}] ${ev.current}`
+        : ev.skipped
+          ? `已在池子里，跳过：${ev.current}（自动补下一位…）`
+          : `[新增 ${ev.index}/${ev.total}] ${ev.current}`;
       break;
     case 'candidate':
       // 合并式池子：已有的岗位跳过（招呼语/勾选/sent 保持原样），只加新的
@@ -850,6 +855,16 @@ function handle(ev) {
       { const j = CANDS.find(x => x.url === ev.url); if (j) { j.greeting = ev.greeting; renderEditRows(); } }
       break;
     case 'collect-done':
+      // mode:'reread' = 刷新活跃度：没有「新增岗位」这回事，只报读到多少 / 删了多少
+      if (ev.mode === 'reread') {
+        $('collectHint').textContent = `刷新完成：${ev.got}/${ev.planned} 个读到活跃度`
+          + (ev.removed ? `，已下架删除 ${ev.removed} 个` : '')
+          + (ev.failed ? `，打不开 ${ev.failed} 个` : '')
+          + (ev.stopped ? '（中途停止）' : '');
+        toast(`活跃度刷新完成：${ev.got} 个拿到新值${ev.removed ? `，下架删除 ${ev.removed} 个` : ''}`);
+        renderRows(); renderFetchRows();
+        break;
+      }
       $('collectHint').textContent = `筛选完成：${ev.ok}/${ev.total} 个拿到了 JD 和招呼语`
         + (ev.exhausted ? '（候选卡片已读完）' : '');
       if (typeof ev.added === 'number') $('fetchInfo').textContent = `已获取 ${CANDS.length} 个（本轮新增 ${ev.added}）`;
@@ -911,21 +926,32 @@ function handle(ev) {
       toast('候选已清空');
       break;
     case 'pool-refresh':
-      // CLI 兜底：agent 绕过 HTTP 命令行跑 collect 时，server 轮询池子文件发现
-      // 变化后广播 —— 按 url 去重合并（只追加新岗位，本地改动不被覆盖）
+      // 池子文件被外部改写后 server 广播（CLI 兜底 + 「刷新活跃度」每写一条就落盘）。
+      // 合并规则：新 url → 追加；已在池子里的 → **只同步 active / activeRaw**（刷新活跃度改的就是这俩，
+      // 不同步的话刷新完面板上还是旧值），招呼语 / 勾选 / sent 一律保留本地不动。
       if (Array.isArray(ev.jobs) && ev.jobs.length) {
-        const seen = new Set(CANDS.map(j => j.url));
-        let added = 0;
+        const seen = new Map(CANDS.map(j => [j.url, j]));
+        let added = 0, updated = 0;
         for (const j of ev.jobs) {
-          if (!j || !j.url || seen.has(j.url)) continue;
-          seen.add(j.url);
-          CANDS.push({ ...j, sent: !!j.sent });
-          added++;
+          if (!j || !j.url) continue;
+          const cur = seen.get(j.url);
+          if (!cur) {
+            seen.set(j.url, j);
+            CANDS.push({ ...j, sent: !!j.sent });
+            added++;
+            continue;
+          }
+          if ((cur.active || '') !== (j.active || '')) { cur.active = j.active || ''; updated++; }
+          cur.activeRaw = j.activeRaw || '';
         }
-        if (added) {
+        if (added || updated) {
           renderRows(); renderFetchRows();
-          $('fetchInfo').textContent = `已获取 ${CANDS.length} 个（本轮新增 ${added}）`;
-          toast(`检测到命令行爬取的新岗位 ${added} 个，已并入池子`);
+          if (added) {
+            $('fetchInfo').textContent = `已获取 ${CANDS.length} 个（本轮新增 ${added}）`;
+            toast(`检测到命令行爬取的新岗位 ${added} 个，已并入池子`);
+          } else {
+            toast(`活跃度已更新 ${updated} 个`);
+          }
         }
       }
       break;
