@@ -68,7 +68,7 @@ const { sleep, rnd, stamp, withoutProxy, localDate, localDateTime, CHROME,
 const { KNOWLEDGE, KNOWLEDGE_FILE, normalizeEntries } = require('./lib/knowledge')(DATA_DIR);
 const { buildGreeting, isGuardUrl } = require('./lib/greeting');
 const { searchUrl, favUrl, readExpectTabs, clickExpectTab } = require('./lib/search')(CFG, SOURCE);
-const { clickByText, clickGreetButton, clickSendButton, fillGreeting, humanWheelScroll, confirmChangeJobDialog } = require('./lib/page-helpers');
+const { clickByText, clickGreetButton, clickSendButton, fillGreeting, humanWheelScroll, cancelChangeJobDialog, readQuotaDialog, dismissQuotaDialog } = require('./lib/page-helpers');
 const { killChromeUsingProfile } = require('./lib/chrome-kill')(CFG.profileDir, LOG_DIR);
 
 // 长尾两段间隔的通用实现：
@@ -223,7 +223,7 @@ const send = require('./lib/send')({
   rt, CFG, SENT_FILE, SEND_LIST_FILE, CONFIRM_EACH, FILL_ONLY,
   log, ipcEmit, checkpoint, StoppedError, isStopped, waitForCmd, hasCmdWaiter,
   buildGreeting, listReferer, paceRand, nextDelaySec, todayCount, waitEnter,
-  clickGreetButton, clickSendButton, fillGreeting, confirmChangeJobDialog,
+  clickGreetButton, clickSendButton, fillGreeting, cancelChangeJobDialog, readQuotaDialog, dismissQuotaDialog,
   gotoWithGuard, realUrl, loadSkipList, markFail, sec, SECURITY_STOP_AT,
 });
 

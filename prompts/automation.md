@@ -21,7 +21,7 @@
 |---|---|---|
 | 服务在跑 | `GET http://127.0.0.1:7788/api/bootstrap` 通 | 让用户双击 `启动.bat` / 跑 `node server.js`；**不要**改走命令行 `greet.js` |
 | BOSS 登录态 | 跑采集时观察是否 emit `kicked-login` | 被踢就中止并把原因写进报告（不要在未登录时硬跑，会爬回一堆空壳） |
-| 额度 | `GET /api/config`（`dailyCap`/`dailyCollectCap`）+ `GET /api/records` | 今日剩余为 0 → 本轮直接收工，不采集、不发送 |
+| 额度 | `GET /api/config`（`dailyCap`/`dailyCollectCap`）+ `GET /api/records` | 今日剩余为 0 → 本轮直接收工，不采集、不发送（平台侧每天最多发 150 条；脚本遇到平台额度提示会自动读出数字，剩 0 立即停） |
 | 参数 | 读 `data/config.json`：`cityCode`/`cityName`、`experience`、`keywords`、`sourceFilters` | 城市/关键词以配置为准；**不要在任务里写死城市**，也先不要用 `POST /api/config` 改它（会覆盖用户设置） |
 
 ## 1. 一筛：采集（四来源可选，按目标总量**分批连采到够**）

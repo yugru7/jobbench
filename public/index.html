@@ -29,12 +29,6 @@
     <p style="font-size:12.5px; color:var(--ink-2); margin:0 0 8px">登录成功后会自动继续，最多等 10 分钟。这个窗口不用关。</p>
   </div>
 
-  <!-- BOSS 安全验证（全局提示） -->
-  <div class="await" id="safeBox" style="border-color: var(--warn); background: var(--warn-wash); display:none">
-    <p class="h" style="color:var(--warn)">BOSS 弹了安全验证，请在浏览器窗口里手动完成</p>
-    <p style="font-size:12.5px; color:var(--ink-2); margin:0 0 8px">滑块拖到最右，或按提示点选图形。完成后这里会自动消失，任务自动继续（最多等 5 分钟）。</p>
-  </div>
-
   <!-- 等你确认（全局提示） -->
   <div class="await" id="awaitBox">
     <p class="h" id="awaitHead">招呼语已填好，等你确认</p>
@@ -169,7 +163,7 @@
         <p class="abli"><b>注意：填进输入框后请尽快手动点发送</b>：这一步只是把文字放进输入框、还没发出去。若此时脚本再次运行、或 BOSS 页面被刷新，输入框里的招呼语就会消失，需要重新生成 / 重填</p>
         <p class="abli"><b>直接发送</b>：填好即自动发送、连着跑，<b>必须你本人在面板上亲自确认</b>才会启动；agent 无权替你点</p>
         <p class="abli">没有"全自动无人值守"选项：机器永远不能替你绕过确认，这是工具的核心设计原则</p>
-        <p class="abli">发送按当日剩余额度自动截断（每日上限默认 60）；遇到安全验证会停下等你人工完成，然后自动继续；「换职位沟通」之类的确认弹窗自动处理；全程随时可「停止」</p>
+        <p class="abli">发送按当日剩余额度自动截断（每日上限默认 60，最高 150 —— 平台普通账号每天最多 150 条）；遇到安全验证会停下等你人工完成，然后自动继续；同一 HR 的另一个岗位若已在沟通，不重复发（该岗位自动标记「已在沟通」）；平台提示「还剩 N 次沟通机会」时会显示到日志、剩 0 立即停；全程随时可「停止」</p>
 
         <p class="absec">⑦ 记录</p>
         <p class="abli">四项统计各含<b>总量与今日</b>：<b>爬取 / 发送 / 放入输入框 / 下架</b>（下架 = 爬过的岗位已失效或被撤）</p>
@@ -400,8 +394,8 @@
             <input type="number" id="setDailyCollectCap" min="1" max="300" oninput="setDirty()">
             <span class="setu">个岗位（1~300）</span></div>
           <div class="setrow"><span class="setk">一天最多发</span>
-            <input type="number" id="setDailyCap" min="1" max="200" oninput="setDirty()">
-            <span class="setu">条招呼语（1~200）</span></div>
+            <input type="number" id="setDailyCap" min="1" max="150" oninput="setDirty()">
+          <span class="setu">条招呼语（1~150，平台每天最多 150）</span></div>
         </div>
 
         <p class="absec">发送招呼语</p>

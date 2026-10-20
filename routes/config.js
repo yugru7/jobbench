@@ -13,10 +13,11 @@ module.exports = (deps) => async (req, res, body) => {
 
   const b = body;
   // 值域钳制：dailyCap/maxJobsPerRun 是安全阀，
-  // 不能被改成 9999 之类绕过限额 —— agent/API 改 config 也必须守住边界
+  // 不能被改成 9999 之类绕过限额 —— agent/API 改 config 也必须守住边界。
+  // dailyCap 上限 150：BOSS 普通账号每天最多发 150 条招呼语，设更高没有意义。
   const cfg = readJson(paths.CONFIG_FILE, {});
   if (Array.isArray(b.keywords)) cfg.keywords = b.keywords.filter(Boolean).slice(0, 30);
-  if (b.dailyCap) cfg.dailyCap = Math.min(Math.max(parseInt(b.dailyCap, 10) || 40, 1), 200);
+  if (b.dailyCap) cfg.dailyCap = Math.min(Math.max(parseInt(b.dailyCap, 10) || 40, 1), 150);
   if (b.maxJobsPerRun) cfg.maxJobsPerRun = Math.min(Math.max(parseInt(b.maxJobsPerRun, 10) || 20, 1), 30);
   if (b.cityCode !== undefined) cfg.cityCode = String(b.cityCode || '');
   if (b.cityName !== undefined) cfg.cityName = String(b.cityName || '');

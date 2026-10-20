@@ -12,6 +12,27 @@ module.exports = (deps) => async (req, res, body) => {
   let items = Array.isArray(b.items) ? b.items.filter(x => x && x.url) : [];
   if (!items.length) return json(res, 400, { ok: false, error: '没有勾选任何岗位' });
 
+  // 「该 HR 已在沟通」的岗位不再发（池子里 dupContact 标记）：面板已把它们藏起来，
+  // 这里再兜一道 —— agent 直接传 url 也发不出去，避免同一个 HR 收到重复招呼语。
+  // 比对按「去掉查询串的基址」：池子里的 url 常带 ?securityId=...，清单里通常没有。
+  const baseUrl = (u) => String(u || '').split('?')[0].split('#')[0];
+  try {
+    const coll = readJson(paths.COLLECT_FILE, null);
+    if (coll && Array.isArray(coll.jobs)) {
+      const dup = new Set(coll.jobs.filter(j => j && j.dupContact).map(j => baseUrl(j.url)));
+      if (dup.size) {
+        const before = items.length;
+        items = items.filter(x => !dup.has(baseUrl(x.url)));
+        if (!items.length) {
+          return json(res, 400, { ok: false, error: '这些岗位的 HR 都已在沟通中（不会重复发），已全部排除' });
+        }
+        if (items.length !== before) {
+          broadcast({ t: 'log', level: 'WARN', msg: `已排除 ${before - items.length} 个「HR 已在沟通」的岗位` });
+        }
+      }
+    }
+  } catch (_) {}
+
   const mode = b.mode || 'fillOnly';    // fillOnly | confirm | auto
   if (!['fillOnly', 'confirm', 'auto'].includes(mode)) {
     return json(res, 400, { ok: false, error: `未知 mode: ${mode}` });

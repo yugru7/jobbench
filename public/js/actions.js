@@ -422,7 +422,7 @@ async function saveSettings() {
   const SINGLE_CHECKS = [
     { el: 'setMaxJobsPerRun',       label: '单次爬取数量',     min: 1,    max: 30,   step: null },
     { el: 'setDailyCollectCap',     label: '每日最多爬',       min: 1,    max: 300,  step: null },
-    { el: 'setDailyCap',            label: '每日最多发',       min: 1,    max: 200,  step: null },
+    { el: 'setDailyCap',            label: '每日最多发',       min: 1,    max: 150,  step: null },
     { el: 'setDelayMinSec',         label: '发送间隔·短段下限', min: 1,    max: 60,   step: 0.5 },
     { el: 'setDelayMaxSec',         label: '发送间隔·短段上限', min: 1,    max: 120,  step: 0.5 },
     { el: 'setDelayTailRatio',      label: '发送间隔·长尾占比', min: 0,    max: 100,  step: 5,   suffix: '%' },

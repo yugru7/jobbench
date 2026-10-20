@@ -133,7 +133,7 @@ async function boot() {
 
   // 恢复候选池（合并式：历史批次累积；sent 标记持久化，发过的不会变回可勾选）
   if (BOOT.lastCollect && Array.isArray(BOOT.lastCollect.jobs) && BOOT.lastCollect.jobs.length) {
-    CANDS = BOOT.lastCollect.jobs.map(j => ({ ...j, sent: !!j.sent }));
+    CANDS = BOOT.lastCollect.jobs.map(j => ({ ...j, sent: !!j.sent, dupContact: !!j.dupContact }));
     restoreChecked();
     renderRows(); renderFetchRows(); renderEditRows();
     pushLog('·', `已恢复候选池：${CANDS.length} 个岗位（${BOOT.lastCollect.at || ''}）`, '');
@@ -236,6 +236,13 @@ function salaryDaily(s) {
   return vals.reduce((a, b) => a + b, 0) / vals.length / 22;   // 月薪折日薪
 }
 
+// 不在表里展示的岗位：
+//   sent        已发送（三个视图都 hide）
+//   dupContact  该 HR 已在沟通（同 HR 的另一个岗位聊过了）—— 招呼语不再重复发，hide
+function jobHidden(j) {
+  return !!j.sent || !!j.dupContact;
+}
+
 function visibleCands() {
   const act = $('fActive').value;
   const salMin = parseFloat(($('fSal') && $('fSal').value) || '') || 0;
@@ -245,8 +252,9 @@ function visibleCands() {
   // 注：不再按「实习/全职」分 —— 关键词判定会把
   // 「实习生勿投 / 不招实习生」这类否定句也算成实习，不可靠，交给人自己看。
   let list = CANDS.map((j, i) => ({ j, i }));
-  // 已发送的直接不进二筛/编辑视图（大概率爬不到了，留着纯噪音）
-  list = list.filter(x => !x.j.sent);
+  // 已发送的直接不进二筛/编辑视图（大概率爬不到了，留着纯噪音）；
+  // 「已在沟通」（该 HR 的另一个岗位已经聊过）同理 —— 不会再重复发，留着也是噪音
+  list = list.filter(x => !jobHidden(x.j));
   // 活跃度：互斥档（在线与今日活跃合成一档，其余各档互不包含）
   if (ACTIVE_TIERS[act]) list = list.filter(x => ACTIVE_TIERS[act].test(x.j.active || ''));
 
@@ -369,7 +377,7 @@ function renderFetchRows() {
   }
   const box = $('fetchRows');
   box.innerHTML = '';
-  const list = CANDS.filter(j => !j.sent);
+  const list = CANDS.filter(j => !jobHidden(j));
   // 勾选集跟着当前列表收敛：已删掉 / 已发送的 url 不该继续占着计数
   FETCH_SEL = new Set([...FETCH_SEL].filter(u => list.some(j => j.url === u)));
   $('fetchWrap').style.display = list.length ? '' : 'none';
@@ -421,6 +429,7 @@ function renderEditRows() {
   list.forEach(({ j, i }) => {
     const d = document.createElement('div');
     d.className = 'trow etrow';
+    d.dataset.url = j.url;   // 招呼语更新时按 url 原地改这一格，不整表重渲染（否则正在打的字会丢焦点）
     d.innerHTML = `
       <div class="ell jobname" title="${attr(j.job)}">${j.src === 'fav' ? '★ ' : ''}${esc(j.job)}</div>
       <div class="ell" title="${attr(j.company)}">${esc(j.company || '-')}</div>
@@ -433,7 +442,7 @@ function renderEditRows() {
 
 function toggleOne(url, on) { on ? CHECKED.add(url) : CHECKED.delete(url); saveChecked(); updateSelInfo(); renderEditRows(); }
 function toggleAll(on) {
-  if (on) visibleCands().forEach(({ j }) => { if (!j.sent) CHECKED.add(j.url); });
+  if (on) visibleCands().forEach(({ j }) => { if (!jobHidden(j)) CHECKED.add(j.url); });
   else CHECKED.clear();
   saveChecked();
   renderRows(); renderEditRows();
@@ -445,7 +454,7 @@ function fetchToggleOne(url, on) {
   renderFetchRows();
 }
 function fetchToggleAll(on) {
-  const list = CANDS.filter(j => !j.sent);
+  const list = CANDS.filter(j => !jobHidden(j));
   FETCH_SEL = on ? new Set(list.map(j => j.url)) : new Set();
   renderFetchRows();
 }
@@ -588,12 +597,28 @@ async function closeBrowser() {
 }
 
 // ---------- 状态 ----------
+let LAST_STATUS = 'idle';   // 安全验证提示结束后要还原成「运行中/空闲」
+let SAFE_ON = false;
+const STATUS_MAP = { idle: ['空闲', ''], running: ['运行中', 'run'], paused: ['已暂停', 'pause'],
+                     stopping: ['正在停止…', 'pause'], error: ['出错了', 'err'] };
+function renderStatusBadge() {
+  const el = $('statusBadge');
+  if (!el) return;
+  if (SAFE_ON) {
+    // 安全验证不占布局：只在页头状态徽标上提示（原来那条黄色横条会把整页往下挤）
+    el.textContent = '需验证';
+    el.className = 'badge pause';
+    el.title = 'BOSS 弹了安全验证，请在浏览器窗口里手动完成（滑块拖到最右或按提示点选，最多等 5 分钟，完成后自动继续）';
+    return;
+  }
+  const [t, c] = STATUS_MAP[LAST_STATUS] || STATUS_MAP.idle;
+  el.textContent = t;
+  el.className = 'badge ' + c;
+  el.title = '';
+}
 function applyState(s) {
-  const map = { idle: ['空闲', ''], running: ['运行中', 'run'], paused: ['已暂停', 'pause'],
-                stopping: ['正在停止…', 'pause'], error: ['出错了', 'err'] };
-  const [t, c] = map[s.status] || map.idle;
-  $('statusBadge').textContent = t;
-  $('statusBadge').className = 'badge ' + c;
+  LAST_STATUS = s.status || 'idle';
+  renderStatusBadge();
   // 刷新后按钮状态要跟服务端实际的开/关对齐 —— browser-kept/closed 事件只在实时切换时推送，
   // 刷新不会重放，所以这里按 bootstrap/state 里的 browserOpen 兜底（未带该字段的局部 state 事件跳过）
   if (s.browserOpen !== undefined) showBrowserUI(s.browserOpen);
@@ -629,7 +654,7 @@ function showAwait(a) {
 }
 function hideAwait() { $('awaitBox').classList.remove('on'); }
 function showLogin(on) { $('loginBox').style.display = on ? 'block' : 'none'; }
-function showSafe(on) { const el = $('safeBox'); if (el) el.style.display = on ? 'block' : 'none'; }
+function showSafe(on) { SAFE_ON = !!on; renderStatusBadge(); }
 
 // ---------- 日志 ----------
 function pushLog(tag, msg, ts) {
@@ -847,12 +872,22 @@ function handle(ev) {
       break;
     case 'candidate':
       // 合并式池子：已有的岗位跳过（招呼语/勾选/sent 保持原样），只加新的
-      if (!CANDS.some(x => x.url === ev.job.url)) CANDS.push({ ...ev.job, sent: false });
+      if (!CANDS.some(x => x.url === ev.job.url)) CANDS.push({ ...ev.job, sent: false, dupContact: !!ev.job.dupContact });
       renderRows(); renderFetchRows();
       break;
     case 'greeting-update':
-      // agent 写回的招呼语（POST /api/greetings）→ 编辑区实时刷新
-      { const j = CANDS.find(x => x.url === ev.url); if (j) { j.greeting = ev.greeting; renderEditRows(); } }
+      // agent 写回的招呼语 → 编辑区实时刷新。
+      // 【踩过的坑】不能整表 renderEditRows()：自己手改招呼语时会触发 0.9 秒防抖保存，
+      // 服务端把同一个值广播回来，整表重建会把正在打字的 textarea 换掉 —— 光标丢失、
+      // 后面打的字全丢，表现为「打几个字就要重新点一下输入框」。
+      // 改成按 url 原地更新这一格；正在编辑（有焦点）的那格直接不动。
+      {
+        const j = CANDS.find(x => x.url === ev.url);
+        if (j) j.greeting = ev.greeting;
+        const row = [...$('editRows').children].find(el => el.dataset.url === ev.url);
+        const ta = row && row.querySelector('textarea');
+        if (ta && document.activeElement !== ta) ta.value = ev.greeting;
+      }
       break;
     case 'collect-done':
       // mode:'reread' = 刷新活跃度：没有「新增岗位」这回事，只报读到多少 / 删了多少
@@ -880,6 +915,37 @@ function handle(ev) {
         renderRows(); renderFetchRows(); renderEditRows(); updateSelInfo();
         if (before !== CANDS.length) toast(`已清理 ${before - CANDS.length} 个已发送岗位`);
       }
+      break;
+    case 'job-dup': {
+      // 同一 HR 已在沟通（这是 TA 的另一个岗位）：招呼语没重复发，
+      // server 已给它打了 dupContact 标记 → 面板也跟着从三张表里隐掉。
+      // 注意：池子里的 url 可能带 ?securityId=…，事件里的是干净 url —— 按基址比对。
+      const base = (u) => String(u || '').split('?')[0].split('#')[0];
+      const key = base(ev.url);
+      const j = CANDS.find((x) => base(x.url) === key);
+      if (j) j.dupContact = true;
+      CHECKED = new Set([...CHECKED].filter((u) => base(u) !== key));
+      saveChecked();
+      renderRows(); renderFetchRows(); renderEditRows(); updateSelInfo();
+      toast(`「${ev.job || '岗位'}」的 HR 已在沟通，跳过不重复发`);
+      pushLog('SKIP', `「${ev.job || '岗位'}」：该 HR 已在沟通（TA 的另一个岗位），不重复发 —— 已标记，以后不再尝试`, '');
+      break;
+    }
+    case 'quota': {
+      // 平台额度提示（「已与 N 位BOSS沟通，还剩 M 次沟通机会」）
+      const parts = [];
+      if (ev.used != null) parts.push(`已与 ${ev.used} 位沟通`);
+      if (ev.remaining != null) parts.push(`还剩 ${ev.remaining} 次`);
+      const txt = parts.join('，');
+      if (txt) {
+        pushLog(ev.remaining != null && ev.remaining <= 5 ? 'WARN' : '·', `平台额度：${txt}`, '');
+        if (ev.remaining != null && ev.remaining <= 5) toast(`平台额度不多了：${txt}`);
+      }
+      break;
+    }
+    case 'quota-stop':
+      pushLog('ERR', '平台今日沟通次数已用完，本轮发送停止', '');
+      toast('平台今日沟通次数已用完，已停止发送');
       break;
     case 'job-removed': {
       // 子进程扫到下架岗位，server 删磁盘+内存后广播；面板跟着删掉
@@ -937,7 +1003,7 @@ function handle(ev) {
           const cur = seen.get(j.url);
           if (!cur) {
             seen.set(j.url, j);
-            CANDS.push({ ...j, sent: !!j.sent });
+            CANDS.push({ ...j, sent: !!j.sent, dupContact: !!j.dupContact });
             added++;
             continue;
           }
@@ -1003,10 +1069,9 @@ function handle(ev) {
       pushLog('ERR', '等了 10 分钟还没登录，本次结束', '');
       break;
     case 'security':
-      // BOSS 安全验证：提示用户去浏览器里手动过，过完自动继续
+      // BOSS 安全验证：只在页头状态徽标上变成「需验证」（悬停看说明），
+      // 不再用黄色横幅挤动整页布局；细节进日志。
       showSafe(!!ev.on);
-      if (ev.on) toast('BOSS 弹了安全验证，请在浏览器里手动完成');
-      else toast('验证已过，继续');
       pushLog(ev.on ? 'WAIT' : 'OK', ev.on ? 'BOSS 弹了安全验证，等你手动完成（最多等 5 分钟）' : '安全验证已通过，继续执行', '');
       break;
     case 'browser-kept':
